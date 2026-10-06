@@ -1,0 +1,3 @@
+id;password;last_login;is_superuser;username;first_name;last_name;email;is_staff;is_active;date_joined;role;phone;can_access_cash_closure;can_manage_insurance;can_view_reports
+1;pbkdf2_sha256$1500000$prcKmFZnGi45pvixI3WS5d$8Utok4BiVp9F+Fr8QeaPuMtjiQSHaAadAZzN+ZrV+Rs=;2026-10-04 12:40:59.004456;1;admin;;;bngounou@inno-soft.net;1;1;2026-09-24 17:27:31.872381;cashier;;0;0;0
+2;pbkdf2_sha256$1500000$U0Qt9cQgMgcTRMGIkWeYvO$6l+uUyI0u8tMl1+d9bxXwPnhnpoGRfcLgZDpmPFtXjM=;2026-09-27 10:59:21.923365;0;carol;;;;0;1;2026-09-27 10:46:55;cashier;;0;0;0

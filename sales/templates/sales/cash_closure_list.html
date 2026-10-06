@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Clôtures de caisse{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-journal-check"></i> Clôtures de caisse</h2>
+        <small class="text-muted">{{ today_closures }} clôture{{ today_closures|pluralize }} aujourd'hui</small>
+    </div>
+    <a href="{% url 'sales:cash_closure_new' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Nouvelle clôture
+    </a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Caissier</th>
+                    <th>Période</th>
+                    <th class="text-end">Théorique</th>
+                    <th class="text-end">Compté</th>
+                    <th class="text-end">Écart</th>
+                    <th class="text-center">Statut</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in closures %}
+                <tr>
+                    <td>{{ c.closure_date|date:"d/m/Y" }}</td>
+                    <td><strong>{{ c.cashier.username }}</strong></td>
+                    <td>
+                        <small>
+                            {{ c.period_start|date:"H:i" }} → {{ c.period_end|date:"H:i" }}
+                        </small>
+                    </td>
+                    <td class="text-end">{{ c.theoretical_total|floatformat:0 }} FCFA</td>
+                    <td class="text-end fw-bold">{{ c.counted_total|floatformat:0 }} FCFA</td>
+                    <td class="text-end fw-bold
+                        {% if c.discrepancy > 0 %}text-success
+                        {% elif c.discrepancy < 0 %}text-danger
+                        {% else %}text-muted{% endif %}">
+                        {% if c.discrepancy > 0 %}+{% endif %}{{ c.discrepancy|floatformat:0 }} FCFA
+                    </td>
+                    <td class="text-center">
+                        {% if c.is_validated %}
+                            <span class="badge bg-success">Validée</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">En attente</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'sales:cash_closure_detail' c.pk %}"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                        Aucune clôture enregistrée
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

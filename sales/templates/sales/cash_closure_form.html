@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Nouvelle clôture{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-journal-plus"></i> Nouvelle clôture</h2>
+        <small class="text-muted">
+            Période : {{ period_start|date:"d/m/Y H:i" }} → {{ period_end|date:"d/m/Y H:i" }}
+        </small>
+    </div>
+    <a href="{% url 'sales:cash_closure_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Retour
+    </a>
+</div>
+
+<div class="row g-3">
+    <!-- Théorique -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Théorique (calculé)</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td><i class="bi bi-cash text-success"></i> Espèces</td>
+                        <td class="text-end fw-bold">{{ preview.theoretical_cash|floatformat:0 }} FCFA</td>
+                    </tr>
+                    <tr>
+                        <td><i class="bi bi-phone text-warning"></i> Orange Money</td>
+                        <td class="text-end fw-bold">{{ preview.theoretical_om|floatformat:0 }} FCFA</td>
+                    </tr>
+                    <tr>
+                        <td><i class="bi bi-phone text-warning"></i> MTN MoMo</td>
+                        <td class="text-end fw-bold">{{ preview.theoretical_momo|floatformat:0 }} FCFA</td>
+                    </tr>
+                    <tr>
+                        <td><i class="bi bi-credit-card text-primary"></i> Carte</td>
+                        <td class="text-end fw-bold">{{ preview.theoretical_card|floatformat:0 }} FCFA</td>
+                    </tr>
+                    <tr class="table-light">
+                        <th>TOTAL THÉORIQUE</th>
+                        <th class="text-end fs-5">{{ preview.theoretical_total|floatformat:0 }} FCFA</th>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saisie du comptage -->
+    <div class="col-lg-6">
+        <form method="post" class="card h-100">
+            {% csrf_token %}
+            <input type="hidden" name="period_start" value="{{ period_start|date:'c' }}">
+            <input type="hidden" name="period_end" value="{{ period_end|date:'c' }}">
+
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Comptage physique</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <label class="form-label small">Espèces comptées</label>
+                    <div class="input-group">
+                        <input type="number" name="counted_cash" step="1" min="0"
+                               class="form-control" id="counted_cash"
+                               value="{{ preview.theoretical_cash|floatformat:0 }}" required>
+                        <span class="input-group-text">FCFA</span>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Orange Money (solde relevé)</label>
+                    <div class="input-group">
+                        <input type="number" name="counted_om" step="1" min="0"
+                               class="form-control" id="counted_om"
+                               value="{{ preview.theoretical_om|floatformat:0 }}" required>
+                        <span class="input-group-text">FCFA</span>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">MTN MoMo (solde relevé)</label>
+                    <div class="input-group">
+                        <input type="number" name="counted_momo" step="1" min="0"
+                               class="form-control" id="counted_momo"
+                               value="{{ preview.theoretical_momo|floatformat:0 }}" required>
+                        <span class="input-group-text">FCFA</span>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Carte (relevé TPE)</label>
+                    <div class="input-group">
+                        <input type="number" name="counted_card" step="1" min="0"
+                               class="form-control" id="counted_card"
+                               value="{{ preview.theoretical_card|floatformat:0 }}" required>
+                        <span class="input-group-text">FCFA</span>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="d-flex justify-content-between fs-5">
+                    <strong>Total compté :</strong>
+                    <strong id="counted-total">0 FCFA</strong>
+                </div>
+                <div class="d-flex justify-content-between mt-2">
+                    <strong>Écart :</strong>
+                    <strong id="discrepancy" class="text-muted">0 FCFA</strong>
+                </div>
+
+                <div class="mt-3">
+                    <label class="form-label small">Notes (optionnel)</label>
+                    <textarea name="notes" class="form-control form-control-sm" rows="2"
+                              placeholder="Justification d'écart, incident..."></textarea>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-circle"></i> Enregistrer la clôture
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Détail des mouvements -->
+<div class="card mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-list-check"></i> Mouvements de la période ({{ movements.count }})</h5>
+    </div>
+    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light" style="position: sticky; top: 0;">
+                <tr>
+                    <th>Heure</th>
+                    <th>Type</th>
+                    <th>Mode</th>
+                    <th class="text-end">Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movements %}
+                <tr>
+                    <td><code>{{ m.date|date:"H:i:s" }}</code></td>
+                    <td>
+                        {% if m.is_inflow %}
+                            <span class="text-success">↓</span> {{ m.get_movement_type_display }}
+                        {% else %}
+                            <span class="text-danger">↑</span> {{ m.get_movement_type_display }}
+                        {% endif %}
+                    </td>
+                    <td>{{ m.get_payment_method_display|default:"—" }}</td>
+                    <td class="text-end {% if m.is_inflow %}text-success{% else %}text-danger{% endif %}">
+                        {% if m.is_inflow %}+{% else %}−{% endif %}{{ m.amount|floatformat:0 }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">
+                        Aucun mouvement sur cette période
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const theoreticalTotal = {{ preview.theoretical_total|floatformat:0 }};
+
+    function updateTotals() {
+        const cash = parseFloat(document.getElementById('counted_cash').value) || 0;
+        const om = parseFloat(document.getElementById('counted_om').value) || 0;
+        const momo = parseFloat(document.getElementById('counted_momo').value) || 0;
+        const card = parseFloat(document.getElementById('counted_card').value) || 0;
+
+        const total = cash + om + momo + card;
+        const discrepancy = total - theoreticalTotal;
+
+        document.getElementById('counted-total').textContent =
+            new Intl.NumberFormat('fr-FR').format(total) + ' FCFA';
+
+        const discEl = document.getElementById('discrepancy');
+        discEl.textContent =
+            (discrepancy >= 0 ? '+' : '') +
+            new Intl.NumberFormat('fr-FR').format(discrepancy) + ' FCFA';
+        discEl.className = discrepancy === 0 ? 'text-muted'
+                          : discrepancy > 0 ? 'text-success fw-bold'
+                          : 'text-danger fw-bold';
+    }
+
+    ['counted_cash', 'counted_om', 'counted_momo', 'counted_card'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateTotals);
+    });
+
+    updateTotals();
+</script>
+{% endblock %}

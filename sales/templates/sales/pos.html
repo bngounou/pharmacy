@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Point de vente — PharmaGest{% endblock %}
+
+{% block extra_css %}
+<style>
+    #medicine-list { max-height: 70vh; overflow-y: auto; }
+    .medicine-card { cursor: pointer; transition: transform 0.15s, background 0.15s; }
+    .medicine-card:hover { background-color: #e7f1ff; transform: translateX(3px); }
+    #cart-items { max-height: 45vh; overflow-y: auto; }
+    .cart-row:hover { background-color: #fff3cd; }
+    .qty-input { width: 70px; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+    <!-- Catalogue -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="search" class="form-control"
+                           placeholder="Rechercher un médicament..." autofocus>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="medicine-list" class="list-group list-group-flush">
+                    {% for med in medicines %}
+                    <button type="button"
+                            class="list-group-item list-group-item-action medicine-card d-flex justify-content-between align-items-center"
+                            data-id="{{ med.id }}"
+                            data-name="{{ med.name|lower }}"
+                            data-generic="{{ med.generic_name|lower }}"
+                            data-barcode="{{ med.barcode|default:'' }}"
+                            data-price="{{ med.cash_price|stringformat:'f' }}"
+                            data-insurance-price="{{ med.insurance_price|default:med.cash_price|stringformat:'f' }}"
+                            data-stock="{{ med.total_stock }}"
+                            data-eligible="{{ med.insurance_eligible|yesno:'1,0' }}">
+                        <div>
+                            <strong>{{ med.name }}</strong>
+                            {% if med.requires_prescription %}
+                                <span class="badge bg-warning text-dark ms-1">Rx</span>
+                            {% endif %}
+                            <br>
+                            <small class="text-muted">
+                                {{ med.category.name }}
+                                {% if med.generic_name %} · {{ med.generic_name }}{% endif %}
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold text-success">{{ med.cash_price|floatformat:0 }} FCFA</div>
+                            <small class="{% if med.is_low_stock %}text-danger{% else %}text-muted{% endif %}">
+                                Stock : {{ med.total_stock }}
+                            </small>
+                        </div>
+                    </button>
+                    {% empty %}
+                    <div class="p-4 text-center text-muted">Aucun médicament enregistré.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panier -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-cart3"></i> Panier</h5>
+            </div>
+            <div class="card-body p-2">
+                <div id="cart-items">
+                    <p class="text-muted text-center py-4 mb-0">
+                        <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
+                        Cliquez sur un médicament pour l'ajouter
+                    </p>
+                </div>
+            </div>
+            <div class="card-footer bg-light">
+
+                <!-- Totaux -->
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between">
+                        <span>Total :</span>
+                        <span class="fw-bold" id="total">0 FCFA</span>
+                    </div>
+                    <div class="d-flex justify-content-between text-primary d-none" id="insurance-line">
+                        <span>Part assurance (<span id="coverage-pct">0</span>%) :</span>
+                        <span class="fw-bold" id="insurance-share">0 FCFA</span>
+                    </div>
+                    <div class="d-flex justify-content-between text-success border-top mt-1 pt-1">
+                        <span class="fw-bold">Patient paie :</span>
+                        <span class="fw-bold fs-5" id="patient-share">0 FCFA</span>
+                    </div>
+                </div>
+
+                <!-- Infos client -->
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <input type="text" id="customer_name" class="form-control form-control-sm"
+                               placeholder="Nom du client">
+                    </div>
+                    <div class="col-6">
+                        <input type="text" id="customer_phone" class="form-control form-control-sm"
+                               placeholder="Téléphone">
+                    </div>
+                </div>
+
+                <!-- Assurance -->
+                <div class="mb-2">
+                    <label class="form-label small mb-0">
+                        <i class="bi bi-shield-check"></i> Assurance
+                    </label>
+                    <select id="insurance" class="form-select form-select-sm">
+                        <option value="" data-rate="0">— Aucune —</option>
+                        {% for ins in insurances %}
+                            <option value="{{ ins.id }}" data-rate="{{ ins.coverage_rate|stringformat:'f' }}">
+                                {{ ins.name }} ({{ ins.coverage_rate|floatformat:2 }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- N° d'assuré — affiché seulement si une assurance est choisie -->
+                <div class="mb-2 d-none" id="patient-id-block">
+                    <label class="form-label small mb-0">
+                        <i class="bi bi-person-vcard"></i> N° d'assuré
+                        <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" id="patient_id" class="form-control form-control-sm"
+                           placeholder="Matricule du patient (ex: CNPS-123456)">
+                </div>
+
+                <!-- Mode de paiement -->
+                <div class="mb-2">
+                    <label class="form-label small mb-0">
+                        <i class="bi bi-credit-card"></i> Paiement patient
+                    </label>
+                    <select id="payment_method" class="form-select form-select-sm">
+                        {% for value, label in payment_methods %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" id="btn-checkout" disabled>
+                        <i class="bi bi-check-circle"></i> Valider la vente
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" id="btn-clear">
+                        <i class="bi bi-trash"></i> Vider le panier
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+
+    const cart = new Map();
+
+    const $list       = document.getElementById('medicine-list');
+    const $cart       = document.getElementById('cart-items');
+    const $total      = document.getElementById('total');
+    const $patientSh  = document.getElementById('patient-share');
+    const $insuranceSh= document.getElementById('insurance-share');
+    const $insuranceLn= document.getElementById('insurance-line');
+    const $coveragePct= document.getElementById('coverage-pct');
+    const $search     = document.getElementById('search');
+    const $btnCheck   = document.getElementById('btn-checkout');
+    const $btnClear   = document.getElementById('btn-clear');
+    const $payment    = document.getElementById('payment_method');
+    const $insurance  = document.getElementById('insurance');
+    const $patientIdBlock = document.getElementById('patient-id-block');
+    const $patientId      = document.getElementById('patient_id');
+
+    const CSRF = '{{ csrf_token }}';
+
+    function formatMoney(n) {
+        return new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' FCFA';
+    }
+
+    function getCoverageRate() {
+        if ($insurance.value === '') return 0;
+        const opt = $insurance.options[$insurance.selectedIndex];
+        const raw = opt.getAttribute('data-rate') || '0';
+        // Gère les deux formats : "0.80" et "0,80"
+        const normalized = raw.replace(',', '.');
+        const rate = parseFloat(normalized);
+        console.log('[POS] Taux brut:', raw, '→ parsé:', rate);
+        return isNaN(rate) ? 0 : rate;
+    }
+
+    function unitPrice(item) {
+        const useInsurance = $insurance.value !== '' && item.eligible === '1';
+        if (useInsurance && item.insurancePrice > 0) {
+            return item.insurancePrice;
+        }
+        return item.cashPrice;
+    }
+
+    function renderCart() {
+        $cart.innerHTML = '';
+
+        if (cart.size === 0) {
+            $cart.innerHTML = `<p class="text-muted text-center py-4 mb-0">
+                <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
+                Cliquez sur un médicament pour l'ajouter
+            </p>`;
+            $total.textContent = '0 FCFA';
+            $patientSh.textContent = '0 FCFA';
+            $insuranceSh.textContent = '0 FCFA';
+            $insuranceLn.classList.add('d-none');
+            $btnCheck.disabled = true;
+            return;
+        }
+
+        let total = 0;
+        cart.forEach((item, id) => {
+            const price = unitPrice(item);
+            const subtotal = price * item.qty;
+            total += subtotal;
+
+            const row = document.createElement('div');
+            row.className = 'cart-row d-flex align-items-center border-bottom py-2 px-2';
+            row.innerHTML = `
+                <div class="flex-grow-1">
+                    <strong>${item.name}</strong><br>
+                    <small class="text-muted">${formatMoney(price)} × ${item.qty}</small>
+                </div>
+                <input type="number" min="1" value="${item.qty}"
+                       class="form-control form-control-sm qty-input me-2"
+                       data-id="${id}" style="width: 70px; text-align: center;">
+                <div class="fw-bold text-end me-2" style="min-width: 90px;">${formatMoney(subtotal)}</div>
+                <button class="btn btn-sm btn-outline-danger remove-btn" data-id="${id}">
+                    <i class="bi bi-x"></i>
+                </button>
+            `;
+            $cart.appendChild(row);
+        });
+
+        const rate = getCoverageRate();
+        const insuranceShare = total * rate;
+        const patientShare = total - insuranceShare;
+
+        $total.textContent = formatMoney(total);
+
+        if (rate > 0) {
+            $insuranceLn.classList.remove('d-none');
+            $coveragePct.textContent = Math.round(rate * 100);
+            $insuranceSh.textContent = formatMoney(insuranceShare);
+        } else {
+            $insuranceLn.classList.add('d-none');
+        }
+
+        // Afficher le champ N° d'assuré uniquement si une assurance est choisie
+        if ($insurance.value !== '') {
+            $patientIdBlock.classList.remove('d-none');
+        } else {
+            $patientIdBlock.classList.add('d-none');
+            $patientId.value = '';   // Vider quand on retire l'assurance
+        }
+
+        $patientSh.textContent = formatMoney(patientShare);
+        $btnCheck.disabled = false;
+    }
+
+    // Ajout au panier
+    $list.addEventListener('click', (e) => {
+        const card = e.target.closest('.medicine-card');
+        if (!card) return;
+
+        const id = card.dataset.id;
+        const name = card.querySelector('strong').textContent.trim();
+        const cashPrice = parseFloat(card.dataset.price);
+        const insurancePrice = parseFloat(card.dataset.insurancePrice) || cashPrice;
+        const eligible = card.dataset.eligible;
+        const stock = parseInt(card.dataset.stock, 10);
+
+        if (cart.has(id)) {
+            cart.get(id).qty += 1;
+        } else {
+            cart.set(id, { name, cashPrice, insurancePrice, eligible, qty: 1, stock });
+        }
+        renderCart();
+    });
+
+    $cart.addEventListener('input', (e) => {
+        if (!e.target.classList.contains('qty-input')) return;
+        const item = cart.get(e.target.dataset.id);
+        let qty = parseInt(e.target.value, 10);
+        if (isNaN(qty) || qty < 1) qty = 1;
+        item.qty = qty;
+        renderCart();
+    });
+
+    $cart.addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-btn');
+        if (!btn) return;
+        cart.delete(btn.dataset.id);
+        renderCart();
+    });
+
+    $btnClear.addEventListener('click', () => {
+        if (cart.size && confirm('Vider tout le panier ?')) {
+            cart.clear();
+            renderCart();
+        }
+    });
+
+    // ─── Recherche live (robuste) ────────────────────────────────
+function normalize(str) {
+    return (str || '')
+        .toString()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+}
+
+function applySearch() {
+    const q = normalize($search.value);
+    let visible = 0;
+
+    document.querySelectorAll('.medicine-card').forEach(card => {
+        const haystack = normalize(
+            (card.dataset.name || '') + ' ' +
+            (card.dataset.generic || '') + ' ' +
+            (card.dataset.barcode || '')
+        );
+        const matches = !q || haystack.includes(q);
+        card.classList.toggle('d-none', !matches);
+        if (matches) visible++;
+    });
+
+    // Message "aucun résultat"
+    let $noResult = document.getElementById('no-result');
+    if (visible === 0 && q) {
+        if (!$noResult) {
+            $noResult = document.createElement('div');
+            $noResult.id = 'no-result';
+            $noResult.className = 'p-4 text-center text-muted';
+            document.getElementById('medicine-list').appendChild($noResult);
+        }
+        $noResult.innerHTML = `
+            <i class="bi bi-search fs-1 d-block mb-2"></i>
+            Aucun médicament ne correspond à "<strong>${$search.value}</strong>"
+        `;
+        $noResult.classList.remove('d-none');
+    } else if ($noResult) {
+        $noResult.classList.add('d-none');
+    }
+}
+
+$search.addEventListener('input', applySearch);
+
+    // Déclencheurs de recalcul
+    $insurance.addEventListener('change', () => {
+        console.log('[POS] Assurance changée →', $insurance.value);
+        renderCart();
+    });
+    $payment.addEventListener('change', renderCart);
+
+    // Validation
+    $btnCheck.addEventListener('click', async () => {
+        const payload = {
+            items: Array.from(cart.entries()).map(([id, item]) => ({
+                medicine_id: id,
+                quantity: item.qty,
+            })),
+            payment_method: $payment.value,
+            insurance_id: $insurance.value || null,
+            patient_id: $patientId.value.trim(),
+            customer_name: document.getElementById('customer_name').value,
+            customer_phone: document.getElementById('customer_phone').value,
+        };
+
+        // Validation côté client
+        if ($insurance.value !== '' && !$patientId.value.trim()) {
+            alert("Veuillez saisir le numéro d'assuré.");
+            $patientId.focus();
+            return;
+        }
+
+        console.log('[POS] Payload envoyé:', payload);
+
+        $btnCheck.disabled = true;
+        $btnCheck.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enregistrement...';
+
+        try {
+            const res = await fetch('/sales/pos/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': CSRF,
+                },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            console.log('[POS] Réponse serveur:', data);
+
+            if (data.success) {
+                window.location.href = data.redirect;
+            } else {
+                alert('Erreur : ' + (data.error || 'Inconnue'));
+                $btnCheck.disabled = false;
+                $btnCheck.innerHTML = '<i class="bi bi-check-circle"></i> Valider la vente';
+            }
+        } catch (err) {
+            alert('Erreur réseau : ' + err.message);
+            $btnCheck.disabled = false;
+            $btnCheck.innerHTML = '<i class="bi bi-check-circle"></i> Valider la vente';
+        }
+    });
+})();
+</script>
+{% endblock %}

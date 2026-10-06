@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Rapport de caisse — {{ report_date|date:"d/m/Y" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .summary-card {
+        border-left: 4px solid var(--bs-primary);
+        transition: transform 0.15s;
+    }
+    .summary-card:hover { transform: translateY(-2px); }
+    .summary-card.success { border-left-color: var(--bs-success); }
+    .summary-card.danger  { border-left-color: var(--bs-danger); }
+    .summary-card.warning { border-left-color: var(--bs-warning); }
+
+    .summary-value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .summary-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #6c757d;
+        letter-spacing: 0.5px;
+    }
+
+    @media print {
+        .no-print { display: none !important; }
+        .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0">
+            <i class="bi bi-cash-stack"></i>
+            Rapport de caisse
+        </h2>
+        <small class="text-muted">
+            {% now "l d F Y" as today_str %}
+            {% if report_date|date:"Y-m-d" == today|date:"Y-m-d" %}
+                Aujourd'hui — {{ report_date|date:"l d F Y" }}
+            {% else %}
+                {{ report_date|date:"l d F Y" }}
+            {% endif %}
+        </small>
+    </div>
+
+    <div class="d-flex gap-2 no-print">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <label class="form-label mb-0 small">Date :</label>
+            <input type="date" name="date" class="form-control form-control-sm"
+                   value="{{ report_date|date:'Y-m-d' }}"
+                   onchange="this.form.submit()">
+        </form>
+        <a href="{% url 'sales:cash_report_export' %}?date={{ report_date|date:'Y-m-d' }}"
+            class="btn btn-outline-success btn-sm">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+        </a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-printer"></i> Imprimer
+        </button>
+    </div>
+</div>
+
+<!-- ─── Cartes de synthèse ─────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card summary-card success h-100">
+            <div class="card-body">
+                <div class="summary-label">Encaissements</div>
+                <div class="summary-value text-success">{{ inflow|floatformat:0 }} FCFA</div>
+                <small class="text-muted">{{ sale_count }} vente{{ sale_count|pluralize }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card summary-card danger h-100">
+            <div class="card-body">
+                <div class="summary-label">Sorties</div>
+                <div class="summary-value text-danger">{{ outflow|floatformat:0 }} FCFA</div>
+                <small class="text-muted">remboursements + dépenses</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card summary-card h-100">
+            <div class="card-body">
+                <div class="summary-label">Solde net de caisse</div>
+                <div class="summary-value text-primary">{{ net_cash|floatformat:0 }} FCFA</div>
+                <small class="text-muted">entrées − sorties</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card summary-card warning h-100">
+            <div class="card-body">
+                <div class="summary-label">Panier moyen</div>
+                <div class="summary-value">{{ average_sale|floatformat:0 }} FCFA</div>
+                <small class="text-muted">par transaction</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── Totaux par mode de paiement ────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-credit-card"></i> Par mode de paiement</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mode</th>
+                            <th class="text-center">Nb</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in payments_summary %}
+                        <tr>
+                            <td>
+                                {% if p.code == 'cash' %}<i class="bi bi-cash text-success"></i>
+                                {% elif p.code == 'orange_money' %}<i class="bi bi-phone text-warning"></i>
+                                {% elif p.code == 'mtn_momo' %}<i class="bi bi-phone text-warning"></i>
+                                {% elif p.code == 'card' %}<i class="bi bi-credit-card-2-front text-primary"></i>
+                                {% else %}<i class="bi bi-wallet2"></i>{% endif %}
+                                {{ p.label }}
+                            </td>
+                            <td class="text-center">{{ p.count }}</td>
+                            <td class="text-end fw-bold">{{ p.total|floatformat:0 }} FCFA</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">
+                                Aucun paiement ce jour
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Par type d'opération</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Type</th>
+                            <th class="text-center">Nb</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in types_summary %}
+                        <tr>
+                            <td>
+                                {% if t.is_inflow %}
+                                    <i class="bi bi-arrow-down-circle text-success"></i>
+                                {% else %}
+                                    <i class="bi bi-arrow-up-circle text-danger"></i>
+                                {% endif %}
+                                {{ t.label }}
+                            </td>
+                            <td class="text-center">{{ t.count }}</td>
+                            <td class="text-end fw-bold">{{ t.total|floatformat:0 }} FCFA</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">
+                                Aucune opération ce jour
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── Ventes avec assurance (info) ──────────────────────── -->
+{% if insurance_sales %}
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-shield-check text-info"></i>
+            Créances assurances générées aujourd'hui
+        </h5>
+        <span class="badge bg-info fs-6">{{ insurance_total|floatformat:0 }} FCFA</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Vente</th>
+                    <th>Patient</th>
+                    <th>N° assuré</th>
+                    <th>Assurance</th>
+                    <th class="text-end">Part patient</th>
+                    <th class="text-end">Part assurance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in insurance_sales %}
+                <tr>
+                    <td><a href="{% url 'sales:detail' s.pk %}">#{{ s.pk }}</a></td>
+                    <td>{{ s.customer_name|default:"—" }}</td>
+                    <td><code>{{ s.patient_id|default:"—" }}</code></td>
+                    <td>{{ s.insurance.name }}</td>
+                    <td class="text-end">{{ s.patient_share|floatformat:0 }} FCFA</td>
+                    <td class="text-end fw-bold text-info">{{ s.insurance_share|floatformat:0 }} FCFA</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- ─── Détail des mouvements ─────────────────────────────── -->
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">
+            <i class="bi bi-clock-history"></i>
+            Détail des mouvements ({{ movements.count }})
+        </h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Heure</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Mode</th>
+                    <th class="text-end">Montant</th>
+                    <th class="text-center">Vente</th>
+                    <th>Caissier</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movements %}
+                <tr>
+                    <td><code>{{ m.date|date:"H:i:s" }}</code></td>
+                    <td>
+                        {% if m.is_inflow %}
+                            <span class="badge bg-success-subtle text-success">{{ m.get_movement_type_display }}</span>
+                        {% else %}
+                            <span class="badge bg-danger-subtle text-danger">{{ m.get_movement_type_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ m.description|default:"—" }}</td>
+                    <td>
+                        {% if m.payment_method %}
+                            {{ m.get_payment_method_display }}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold
+                        {% if m.is_inflow %}text-success{% else %}text-danger{% endif %}">
+                        {% if m.is_inflow %}+{% else %}−{% endif %}{{ m.amount|floatformat:0 }} FCFA
+                    </td>
+                    <td class="text-center">
+                        {% if m.sale %}
+                            <a href="{% url 'sales:detail' m.sale.pk %}">#{{ m.sale.pk }}</a>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{{ m.created_by.username|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                        Aucun mouvement enregistré pour cette date
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if movements %}
+            <tfoot class="table-light">
+                <tr>
+                    <th colspan="4" class="text-end">Solde net :</th>
+                    <th class="text-end {% if net_cash >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ net_cash|floatformat:0 }} FCFA
+                    </th>
+                    <th colspan="2"></th>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<!-- Signature (pour impression) -->
+<div class="row mt-5 d-none d-print-flex">
+    <div class="col-6">
+        <p class="mb-5">Le caissier :</p>
+        <hr class="w-75">
+    </div>
+    <div class="col-6">
+        <p class="mb-5">Le responsable :</p>
+        <hr class="w-75">
+    </div>
+</div>
+{% endblock %}
