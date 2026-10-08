@@ -26,6 +26,12 @@ class User(AbstractUser):
         help_text="Autorise l'accès aux rapports de vente et de caisse."
     )
 
+    can_manage_inventory = models.BooleanField(
+        "Peut gérer l'inventaire", default=False,
+        help_text="Autorise la création, modification et suppression des médicaments, "
+                  "catégories et fournisseurs."
+    )
+
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 

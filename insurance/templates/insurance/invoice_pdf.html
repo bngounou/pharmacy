@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Facture {{ invoice.invoice_number }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            color: #212529;
+        }
+
+        /* En-tête : tableau au lieu de flexbox */
+        .header-table {
+            width: 100%;
+            border-bottom: 3px solid #0d6efd;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .header-table td {
+            vertical-align: top;
+            padding: 5px;
+        }
+        .pharmacy-name {
+            color: #0d6efd;
+            font-size: 20pt;
+            font-weight: bold;
+            margin: 0;
+        }
+        .pharmacy-sub {
+            color: #6c757d;
+            font-size: 9pt;
+            margin: 2px 0;
+        }
+        .invoice-title {
+            color: #0d6efd;
+            font-size: 14pt;
+            font-weight: bold;
+            text-align: right;
+        }
+        .invoice-meta {
+            text-align: right;
+            font-size: 9pt;
+            color: #6c757d;
+        }
+
+        /* Bloc assurance */
+        .insurance-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+        }
+        .insurance-box h3 {
+            margin: 0 0 4px 0;
+            font-size: 12pt;
+        }
+        .insurance-box p {
+            margin: 2px 0;
+            font-size: 9pt;
+            color: #6c757d;
+        }
+
+        /* Tableau principal */
+        table.items {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        table.items th {
+            background-color: #495057;
+            color: white;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 9pt;
+            text-transform: uppercase;
+        }
+        table.items td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 9pt;
+        }
+        .text-end { text-align: right; }
+        .text-center { text-align: center; }
+
+        /* Total */
+        table.total-table {
+            width: 100%;
+            margin-top: 10px;
+        }
+        table.total-table td {
+            padding: 8px 12px;
+            font-size: 11pt;
+        }
+        .total-cell {
+            background-color: #d1e7dd;
+            font-weight: bold;
+            border-top: 2px solid #0d6efd;
+            border-bottom: 2px solid #0d6efd;
+        }
+
+        /* Signatures */
+        table.signatures {
+            width: 100%;
+            margin-top: 50px;
+        }
+        table.signatures td {
+            width: 50%;
+            text-align: center;
+            padding-top: 40px;
+            font-size: 9pt;
+        }
+        .signature-line {
+            border-top: 1px solid #212529;
+            width: 70%;
+            margin: 5px auto 0 auto;
+            padding-top: 5px;
+        }
+
+        /* Pied de page */
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+            font-size: 8pt;
+            color: #6c757d;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- En-tête -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 60%;">
+                <div class="pharmacy-name">PharmaGest</div>
+                <p class="pharmacy-sub">Votre pharmacie de confiance</p>
+                <p class="pharmacy-sub">Tél : +237 XXX XXX XXX</p>
+                <p class="pharmacy-sub">Email : contact@pharmagest.cm</p>
+            </td>
+            <td style="width: 40%;">
+                <div class="invoice-title">FACTURE</div>
+                <div class="invoice-meta">
+                    <strong>{{ invoice.invoice_number }}</strong><br>
+                    Émise le {{ invoice.invoice_date|date:"d/m/Y" }}<br>
+                    {% if invoice.due_date %}
+                        Échéance : {{ invoice.due_date|date:"d/m/Y" }}
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Infos assurance -->
+    <div class="insurance-box">
+        <h3>{{ invoice.insurance.name }}</h3>
+        <p>Code : {{ invoice.insurance.code }}</p>
+        <p>Période couverte : du {{ invoice.period_start|date:"d/m/Y" }} au {{ invoice.period_end|date:"d/m/Y" }}</p>
+    </div>
+
+    <!-- Tableau des créances -->
+    <table class="items">
+        <thead>
+            <tr>
+                <th style="width: 12%;">Date</th>
+                <th style="width: 10%;">Vente</th>
+                <th style="width: 30%;">Patient</th>
+                <th style="width: 20%;">N° assuré</th>
+                <th class="text-end" style="width: 15%;">Montant (FCFA)</th>
+                <th style="width: 13%;">Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for claim in claims %}
+            <tr>
+                <td>{{ claim.sale.created_at|date:"d/m/Y" }}</td>
+                <td>#{{ claim.sale_id }}</td>
+                <td>{{ claim.patient_name }}</td>
+                <td>{{ claim.patient_id|default:"—" }}</td>
+                <td class="text-end">{{ claim.amount_claimed|floatformat:2 }}</td>
+                <td>{{ claim.get_status_display }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center" style="color: #999;">
+                    Aucune créance sur cette facture
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Total -->
+    <table class="total-table">
+        <tr>
+            <td style="width: 60%;">&nbsp;</td>
+            <td class="total-cell">TOTAL À PAYER :</td>
+            <td class="total-cell text-end">{{ invoice.total_claimed|floatformat:2 }} FCFA</td>
+        </tr>
+        {% if invoice.total_paid > 0 %}
+        <tr>
+            <td>&nbsp;</td>
+            <td>Déjà payé :</td>
+            <td class="text-end">{{ invoice.total_paid|floatformat:2 }} FCFA</td>
+        </tr>
+        <tr>
+            <td>&nbsp;</td>
+            <td><strong>Solde dû :</strong></td>
+            <td class="text-end"><strong>{{ invoice.balance_due|floatformat:2 }} FCFA</strong></td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <!-- Signatures -->
+    <table class="signatures">
+        <tr>
+            <td>
+                <div>Le Responsable</div>
+                <div class="signature-line">&nbsp;</div>
+            </td>
+            <td>
+                <div>Cachet & signature de la pharmacie</div>
+                <div class="signature-line">&nbsp;</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Pied de page -->
+    <div class="footer">
+        Facture générée le {{ today|date:"d/m/Y à H:i" }} — PharmaGest
+    </div>
+
+</body>
+</html>

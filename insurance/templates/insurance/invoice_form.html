@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Nouvelle facture assurance{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-receipt"></i> Nouvelle facture groupée</h2>
+        <small class="text-muted">Regroupez les créances d'une assurance sur une période</small>
+    </div>
+    <a href="{% url 'insurance:dashboard' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Retour
+    </a>
+</div>
+
+<!-- ─── Étape 1 : sélection ────────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="bi bi-funnel"></i> Étape 1 — Sélectionner</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label small">Assurance</label>
+                <select name="insurance" class="form-select" required>
+                    <option value="">— Choisir —</option>
+                    {% for ins in insurances %}
+                        <option value="{{ ins.id }}"
+                                {% if selected_insurance.id == ins.id %}selected{% endif %}>
+                            {{ ins.name }} ({{ ins.code }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Type de période</label>
+                <select name="period_type" class="form-select">
+                    <option value="weekly" {% if period_type == 'weekly' %}selected{% endif %}>Hebdomadaire</option>
+                    <option value="monthly" {% if period_type == 'monthly' %}selected{% endif %}>Mensuelle</option>
+                    <option value="custom" {% if period_type == 'custom' %}selected{% endif %}>Personnalisée</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Du</label>
+                <input type="date" name="period_start" class="form-control"
+                       value="{{ period_start|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Au</label>
+                <input type="date" name="period_end" class="form-control"
+                       value="{{ period_end|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Voir les créances
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ─── Étape 2 : preview ──────────────────────────────────── -->
+{% if selected_insurance %}
+    {% if claims_preview %}
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="insurance" value="{{ selected_insurance.id }}">
+        <input type="hidden" name="period_type" value="{{ period_type }}">
+        <input type="hidden" name="period_start" value="{{ period_start|date:'Y-m-d' }}">
+        <input type="hidden" name="period_end" value="{{ period_end|date:'Y-m-d' }}">
+
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-check"></i>
+                    Étape 2 — Confirmer ({{ claims_preview|length }} créance{{ claims_preview|length|pluralize }})
+                </h5>
+                <span class="fs-5">
+                    Total : <strong>{{ total_preview|floatformat:0 }} FCFA</strong>
+                </span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="check-all" checked>
+                            </th>
+                            <th>Date</th>
+                            <th>Vente</th>
+                            <th>Patient</th>
+                            <th>N° assuré</th>
+                            <th class="text-end">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for claim in claims_preview %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" name="claim_ids" value="{{ claim.id }}"
+                                       class="claim-checkbox" checked>
+                            </td>
+                            <td>{{ claim.sale.created_at|date:"d/m/Y" }}</td>
+                            <td>
+                                <a href="{% url 'sales:detail' claim.sale.pk %}">
+                                    #{{ claim.sale.pk }}
+                                </a>
+                            </td>
+                            <td>{{ claim.patient_name }}</td>
+                            <td><code>{{ claim.patient_id|default:"—" }}</code></td>
+                            <td class="text-end fw-bold">
+                                {{ claim.amount_claimed|floatformat:0 }} FCFA
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="5" class="text-end">Total sélectionné :</th>
+                            <th class="text-end fs-5" id="selected-total">
+                                {{ total_preview|floatformat:0 }} FCFA
+                            </th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="card-footer">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <a href="{% url 'insurance:invoice_new' %}" class="btn btn-outline-secondary">
+                        Annuler
+                    </a>
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-circle"></i> Créer la facture
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        Aucune créance non facturée pour <strong>{{ selected_insurance.name }}</strong>
+        sur la période {{ period_start|date:"d/m/Y" }} → {{ period_end|date:"d/m/Y" }}.
+    </div>
+    {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const checkAll = document.getElementById('check-all');
+    if (checkAll) {
+        const checkboxes = document.querySelectorAll('.claim-checkbox');
+        const totalEl = document.getElementById('selected-total');
+        const amounts = {};
+
+        {% for claim in claims_preview %}
+        amounts[{{ claim.id }}] = {{ claim.amount_claimed }};
+        {% endfor %}
+
+        function updateTotal() {
+            let total = 0;
+            checkboxes.forEach(cb => {
+                if (cb.checked) total += amounts[cb.value] || 0;
+            });
+            totalEl.textContent = new Intl.NumberFormat('fr-FR').format(total) + ' FCFA';
+        }
+
+        checkAll.addEventListener('change', () => {
+            checkboxes.forEach(cb => cb.checked = checkAll.checked);
+            updateTotal();
+        });
+
+        checkboxes.forEach(cb => cb.addEventListener('change', updateTotal));
+    }
+</script>
+{% endblock %}

@@ -4,7 +4,7 @@
     <option name="synchronizeBranchProtectionRules" value="false" />
   </component>
   <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/git repository" vcs="Git" />
   </component>
 </project>

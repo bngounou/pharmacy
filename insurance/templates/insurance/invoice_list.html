@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Factures assurances{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-receipt"></i> Factures assurances</h2>
+        <small class="text-muted">{{ page_obj.paginator.count }} facture{{ page_obj.paginator.count|pluralize }}</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'insurance:dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Dashboard
+        </a>
+        <a href="{% url 'insurance:invoice_new' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nouvelle facture
+        </a>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Assurance</label>
+                <select name="insurance" class="form-select form-select-sm">
+                    <option value="">— Toutes —</option>
+                    {% for ins in insurances %}
+                        <option value="{{ ins.id }}" {% if insurance_filter == ins.id|stringformat:'s' %}selected{% endif %}>
+                            {{ ins.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Statut</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">— Tous —</option>
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-funnel"></i> Filtrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>N° facture</th>
+                    <th>Assurance</th>
+                    <th>Période</th>
+                    <th class="text-center">Créances</th>
+                    <th class="text-end">Réclamé</th>
+                    <th class="text-end">Payé</th>
+                    <th class="text-end">Solde</th>
+                    <th>Statut</th>
+                    <th>Échéance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in page_obj %}
+                <tr>
+                    <td>
+                        <a href="{% url 'insurance:invoice_detail' inv.pk %}">
+                            <strong>{{ inv.invoice_number }}</strong>
+                        </a>
+                    </td>
+                    <td>{{ inv.insurance.name }}</td>
+                    <td>
+                        <small>{{ inv.period_start|date:"d/m/Y" }} → {{ inv.period_end|date:"d/m/Y" }}</small>
+                    </td>
+                    <td class="text-center">{{ inv.claims_count }}</td>
+                    <td class="text-end fw-bold">{{ inv.total_claimed|floatformat:0 }}</td>
+                    <td class="text-end text-success">{{ inv.total_paid|floatformat:0 }}</td>
+                    <td class="text-end fw-bold
+                        {% if inv.balance_due > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ inv.balance_due|floatformat:0 }}
+                    </td>
+                    <td>
+                        {% if inv.status == 'paid' %}
+                            <span class="badge bg-success">{{ inv.get_status_display }}</span>
+                        {% elif inv.status == 'draft' %}
+                            <span class="badge bg-secondary">{{ inv.get_status_display }}</span>
+                        {% elif inv.status == 'sent' %}
+                            <span class="badge bg-info">{{ inv.get_status_display }}</span>
+                        {% elif inv.status == 'partially_paid' %}
+                            <span class="badge bg-warning text-dark">{{ inv.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge bg-danger">{{ inv.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if inv.due_date %}
+                            {{ inv.due_date|date:"d/m/Y" }}
+                            {% if inv.days_overdue > 0 %}
+                                <br><span class="badge bg-danger">+{{ inv.days_overdue }}j</span>
+                            {% endif %}
+                        {% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                        Aucune facture enregistrée
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

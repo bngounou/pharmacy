@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Saisir un paiement assurance{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-cash-coin"></i> Saisir un paiement</h2>
+        <small class="text-muted">Imputation automatique FIFO sur les créances</small>
+    </div>
+    <a href="{% url 'insurance:payment_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-list"></i> Historique
+    </a>
+</div>
+
+<!-- ─── Étape 1 : sélection de la cible ──────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="bi bi-funnel"></i> Étape 1 — Cibler</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label small">Assurance</label>
+                <select name="insurance" class="form-select" required>
+                    <option value="">— Choisir —</option>
+                    {% for ins in insurances %}
+                        <option value="{{ ins.id }}" {% if insurance.id == ins.id %}selected{% endif %}>
+                            {{ ins.name }} ({{ ins.code }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Type de ciblage</label>
+                <select name="target_type" class="form-select" id="target-type">
+                    <option value="all" {% if target_type == 'all' %}selected{% endif %}>
+                        FIFO global (toutes créances ouvertes)
+                    </option>
+                    <option value="invoice" {% if target_type == 'invoice' %}selected{% endif %}>
+                        Facture spécifique
+                    </option>
+                </select>
+            </div>
+            <div class="col-md-3" id="invoice-selector" style="{% if target_type != 'invoice' %}display:none{% endif %}">
+                <label class="form-label small">Facture ciblée</label>
+                <select name="invoice_id" class="form-select">
+                    <option value="">— Choisir —</option>
+                    {% for inv in open_invoices %}
+                        <option value="{{ inv.id }}" {% if invoice.id == inv.id %}selected{% endif %}>
+                            {{ inv.invoice_number }} — {{ inv.balance_due|floatformat:0 }} FCFA
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Voir les créances
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if insurance %}
+<!-- ─── Étape 2 : saisie du paiement ─────────────────────────── -->
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="insurance" value="{{ insurance.id }}">
+    <input type="hidden" name="target_type" value="{{ target_type }}">
+    <input type="hidden" name="invoice_id" value="{{ invoice.id|default:'' }}">
+
+    <div class="row g-3">
+        <!-- Créances éligibles -->
+        <div class="col-lg-7">
+            <div class="card h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check"></i>
+                        {{ eligible_claims|length }} créance{{ eligible_claims|length|pluralize }} éligible{{ eligible_claims|length|pluralize }}
+                    </h5>
+                    <span class="fs-6">
+                        Total dû : <strong class="text-danger">{{ total_outstanding|floatformat:0 }} FCFA</strong>
+                    </span>
+                </div>
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light" style="position: sticky; top: 0;">
+                            <tr>
+                                <th>Date</th>
+                                <th>Patient</th>
+                                <th class="text-end">Montant</th>
+                                <th class="text-end">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for claim in eligible_claims %}
+                            <tr>
+                                <td><small>{{ claim.sale.created_at|date:"d/m/Y" }}</small></td>
+                                <td>
+                                    {{ claim.patient_name }}
+                                    {% if claim.patient_id %}
+                                        <br><small class="text-muted">{{ claim.patient_id }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">{{ claim.amount_claimed|floatformat:0 }}</td>
+                                <td class="text-end fw-bold text-danger">{{ claim.balance_due|floatformat:0 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">
+                                    Aucune créance éligible
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulaire de paiement -->
+        <div class="col-lg-5">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-cash"></i> Détails du paiement</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Montant -->
+                    <div class="mb-3">
+                        <label class="form-label">Montant reçu <span class="text-danger">*</span></label>
+                        <div class="input-group input-group-lg">
+                            <input type="number" name="amount" id="amount" step="1" min="1"
+                                   max="{{ total_outstanding|floatformat:0 }}"
+                                   class="form-control" required
+                                   placeholder="0">
+                            <span class="input-group-text">FCFA</span>
+                        </div>
+                        <div class="form-text">
+                            Total dû : {{ total_outstanding|floatformat:0 }} FCFA
+                            <button type="button" class="btn btn-sm btn-link p-0 ms-2"
+                                    onclick="document.getElementById('amount').value = {{ total_outstanding|floatformat:0 }};">
+                                Tout payer
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Aperçu allocation -->
+                    <div class="alert alert-info py-2" id="preview" style="display:none">
+                        <small>
+                            <i class="bi bi-info-circle"></i>
+                            <span id="preview-text"></span>
+                        </small>
+                    </div>
+
+                    <hr>
+
+                    <!-- Date -->
+                    <div class="mb-2">
+                        <label class="form-label small">Date de paiement</label>
+                        <input type="date" name="payment_date" class="form-control form-control-sm"
+                               value="{{ today|date:'Y-m-d' }}" required>
+                    </div>
+
+                    <!-- Mode -->
+                    <div class="mb-2">
+                        <label class="form-label small">Mode</label>
+                        <select name="payment_method" class="form-select form-select-sm">
+                            {% for value, label in payment_methods %}
+                                <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Référence -->
+                    <div class="mb-2">
+                        <label class="form-label small">Référence</label>
+                        <input type="text" name="reference" class="form-control form-control-sm"
+                               placeholder="Auto-généré si vide">
+                        <div class="form-text small">N° de virement, chèque, bordereau...</div>
+                    </div>
+
+                    <!-- Compte -->
+                    <div class="mb-2">
+                        <label class="form-label small">Compte crédité</label>
+                        <input type="text" name="bank_account" class="form-control form-control-sm"
+                               placeholder="Ex: BICEC 000123456">
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-2">
+                        <label class="form-label small">Notes</label>
+                        <textarea name="notes" class="form-control form-control-sm" rows="2"
+                                  placeholder="Observations..."></textarea>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg"
+                                {% if not eligible_claims %}disabled{% endif %}>
+                            <i class="bi bi-check-circle"></i> Enregistrer le paiement
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Afficher/masquer le sélecteur de facture selon le type de ciblage
+    const targetType = document.getElementById('target-type');
+    const invoiceSelector = document.getElementById('invoice-selector');
+    if (targetType && invoiceSelector) {
+        targetType.addEventListener('change', () => {
+            invoiceSelector.style.display = targetType.value === 'invoice' ? '' : 'none';
+        });
+    }
+
+    // Aperçu de l'allocation
+    const amountInput = document.getElementById('amount');
+    const preview = document.getElementById('preview');
+    const previewText = document.getElementById('preview-text');
+    const totalOutstanding = {{ total_outstanding|default:0 }};
+    const balances = [
+        {% for c in eligible_claims %}{{ c.balance_due|floatformat:2 }},{% endfor %}
+    ];
+
+    if (amountInput) {
+        amountInput.addEventListener('input', () => {
+            const amount = parseFloat(amountInput.value) || 0;
+            if (amount <= 0) {
+                preview.style.display = 'none';
+                return;
+            }
+
+            // Simuler l'allocation FIFO
+            let remaining = amount;
+            let covered = 0;
+            for (const b of balances) {
+                if (remaining <= 0) break;
+                if (remaining >= b) {
+                    covered++;
+                    remaining -= b;
+                } else {
+                    covered++;
+                    remaining = 0;
+                    break;
+                }
+            }
+
+            let text = `${covered} créance${covered > 1 ? 's' : ''} `;
+            if (amount >= totalOutstanding) {
+                text += `— solde total. Reste : ${(amount - totalOutstanding).toFixed(0)} FCFA (ignoré).`;
+            } else {
+                text += `seront couvertes.`;
+            }
+            previewText.textContent = text;
+            preview.style.display = '';
+        });
+    }
+</script>
+{% endblock %}

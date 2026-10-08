@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Facture {{ invoice.invoice_number }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .info-label { font-size: 0.75rem; text-transform: uppercase; color: #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-receipt"></i> Facture {{ invoice.invoice_number }}</h2>
+        <small class="text-muted">{{ invoice.insurance.name }}</small>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'insurance:invoice_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Retour
+        </a>
+        <a href="{% url 'insurance:invoice_pdf' invoice.pk %}" class="btn btn-danger">
+            <i class="bi bi-file-pdf"></i> PDF
+        </a>
+        <a href="{% url 'insurance:invoice_excel' invoice.pk %}" class="btn btn-success">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+        </a>
+        {% if invoice.status == 'draft' %}
+        <form method="post" action="{% url 'insurance:invoice_send' invoice.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary"
+                    onclick="return confirm('Marquer cette facture comme envoyée ?');">
+                <i class="bi bi-send"></i> Marquer comme envoyée
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Statut -->
+<div class="alert
+    {% if invoice.status == 'paid' %}alert-success
+    {% elif invoice.status == 'rejected' %}alert-danger
+    {% elif invoice.status == 'sent' %}alert-info
+    {% elif invoice.status == 'partially_paid' %}alert-warning
+    {% else %}alert-secondary{% endif %}">
+    <i class="bi bi-info-circle"></i>
+    Statut : <strong>{{ invoice.get_status_display }}</strong>
+    {% if invoice.days_overdue > 0 %}
+        — <span class="text-danger fw-bold">{{ invoice.days_overdue }} jours de retard</span>
+    {% endif %}
+</div>
+
+<!-- Info facture -->
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="info-label">Assurance</div>
+                <strong>{{ invoice.insurance.name }}</strong>
+            </div>
+            <div class="col-md-3">
+                <div class="info-label">Période</div>
+                <strong>{{ invoice.period_start|date:"d/m/Y" }} → {{ invoice.period_end|date:"d/m/Y" }}</strong>
+            </div>
+            <div class="col-md-2">
+                <div class="info-label">Émise le</div>
+                <strong>{{ invoice.invoice_date|date:"d/m/Y" }}</strong>
+            </div>
+            <div class="col-md-2">
+                <div class="info-label">Échéance</div>
+                <strong>{{ invoice.due_date|date:"d/m/Y"|default:"—" }}</strong>
+            </div>
+            <div class="col-md-2">
+                <div class="info-label">Créée par</div>
+                <strong>{{ invoice.created_by.username|default:"—" }}</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Montants -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="info-label">Montant réclamé</div>
+                <div class="fs-4 fw-bold">{{ invoice.total_claimed|floatformat:0 }} FCFA</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="info-label">Montant reçu</div>
+                <div class="fs-4 fw-bold text-success">{{ invoice.total_paid|floatformat:0 }} FCFA</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="info-label">Solde dû</div>
+                <div class="fs-4 fw-bold text-danger">{{ invoice.balance_due|floatformat:0 }} FCFA</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Créances -->
+<div class="card mb-3">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-list-check"></i> Créances ({{ claims|length }})</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Vente</th>
+                    <th>Patient</th>
+                    <th>N° assuré</th>
+                    <th class="text-end">Montant</th>
+                    <th class="text-end">Payé</th>
+                    <th>Statut</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for claim in claims %}
+                <tr>
+                    <td>{{ claim.sale.created_at|date:"d/m/Y" }}</td>
+                    <td><a href="{% url 'sales:detail' claim.sale.pk %}">#{{ claim.sale.pk }}</a></td>
+                    <td>{{ claim.patient_name }}</td>
+                    <td><code>{{ claim.patient_id|default:"—" }}</code></td>
+                    <td class="text-end">{{ claim.amount_claimed|floatformat:0 }}</td>
+                    <td class="text-end">{{ claim.amount_paid|floatformat:0 }}</td>
+                    <td>{{ claim.get_status_display }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <th colspan="4" class="text-end">TOTAL</th>
+                    <th class="text-end">{{ invoice.total_claimed|floatformat:0 }}</th>
+                    <th class="text-end">{{ invoice.total_paid|floatformat:0 }}</th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+{% if invoice.notes %}
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="info-label">Notes</div>
+        {{ invoice.notes }}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

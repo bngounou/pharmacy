@@ -44,8 +44,15 @@
 
                 {% if user.can_manage_insurance or user.is_superuser %}
                 <li class="nav-item">
-                    <a class="nav-link" href="#">
+                    <a class="nav-link" href="{% url 'insurance:dashboard' %}">
                         <i class="bi bi-shield-check"></i> Assurances
+                    </a>
+                </li>
+                {% endif %}
+                {% if user.can_manage_insurance or user.is_superuser %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'insurance:payment_list' %}">
+                        <i class="bi bi-cash-coin"></i> Paiements assurances
                     </a>
                 </li>
                 {% endif %}

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Assurances — Tableau de bord{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-left: 4px solid var(--bs-primary);
+        transition: transform 0.15s;
+    }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-card.danger { border-left-color: var(--bs-danger); }
+    .stat-card.warning { border-left-color: var(--bs-warning); }
+    .stat-card.success { border-left-color: var(--bs-success); }
+    .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #6c757d;
+        letter-spacing: 0.5px;
+    }
+    .aging-box {
+        padding: 1rem;
+        border-radius: 0.375rem;
+        text-align: center;
+    }
+    .aging-0-30 { background-color: #d1f2eb; }
+    .aging-31-60 { background-color: #fff3cd; }
+    .aging-61-90 { background-color: #ffe5d0; }
+    .aging-90plus { background-color: #f8d7da; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-shield-check"></i> Assurances — Créances</h2>
+        <small class="text-muted">Suivi des montants dus par les assureurs</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'insurance:invoice_new' %}" class="btn btn-primary">
+            <i class="bi bi-receipt"></i> Générer une facture
+        </a>
+        <a href="{% url 'insurance:payment_new' %}" class="btn btn-outline-success">
+            <i class="bi bi-cash-coin"></i> Saisir un paiement
+        </a>
+    </div>
+</div>
+
+<!-- ─── Cartes de synthèse ─────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card stat-card warning h-100">
+            <div class="card-body">
+                <div class="stat-label">Total en attente</div>
+                <div class="stat-value text-warning">{{ total_outstanding|floatformat:0 }}</div>
+                <small class="text-muted">FCFA à recevoir</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card danger h-100">
+            <div class="card-body">
+                <div class="stat-label">Échues (en retard)</div>
+                <div class="stat-value text-danger">{{ total_overdue|floatformat:0 }}</div>
+                <small class="text-muted">FCFA en retard</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">Créances non facturées</div>
+                <div class="stat-value">{{ pending_count }}</div>
+                <small class="text-muted">à regrouper dans une facture</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── Vieillissement ─────────────────────────────────────── -->
+
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-hourglass-split"></i> Vieillissement des créances</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-2">
+            {% for row in aging_rows %}
+            <div class="col-md-3">
+                <div class="aging-box {{ row.class }}">
+                    <small class="text-muted">{{ row.label }}</small>
+                    <div class="fs-5 fw-bold">{{ row.amount|floatformat:0 }} FCFA</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ─── Détail par assurance ────────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-building"></i> Par assurance</h5>
+        <a href="{% url 'insurance:claim_list' %}" class="btn btn-sm btn-outline-secondary">
+            Voir toutes les créances
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Assurance</th>
+                    <th class="text-center">Créances</th>
+                    <th class="text-end">Montant dû</th>
+                    <th class="text-end">Dont en retard</th>
+                    <th class="text-center">Ancienneté max</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in per_insurance %}
+                <tr>
+                    <td>
+                        <strong>{{ row.insurance.name }}</strong>
+                        <br>
+                        <small class="text-muted">
+                            Couverture : {{ row.insurance.coverage_rate|floatformat:2 }}
+                            · Délai : {{ row.insurance.payment_delay_days }}j
+                        </small>
+                    </td>
+                    <td class="text-center">{{ row.count }}</td>
+                    <td class="text-end fw-bold">{{ row.outstanding|floatformat:0 }} FCFA</td>
+                    <td class="text-end {% if row.overdue > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                        {{ row.overdue|floatformat:0 }} FCFA
+                    </td>
+                    <td class="text-center">
+                        {% if row.max_age_days > 90 %}
+                            <span class="badge bg-danger">{{ row.max_age_days }}j</span>
+                        {% elif row.max_age_days > 60 %}
+                            <span class="badge bg-warning text-dark">{{ row.max_age_days }}j</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ row.max_age_days }}j</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'insurance:claim_list' %}?insurance={{ row.insurance.id }}"
+                           class="btn btn-sm btn-outline-primary">Détails</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>
+                        Aucune créance en attente
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ─── Top 10 des créances les plus anciennes ─────────────── -->
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-clock-history"></i> 10 créances les plus anciennes</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Assurance</th>
+                    <th>Patient</th>
+                    <th>N° assuré</th>
+                    <th class="text-end">Montant</th>
+                    <th class="text-center">Âge</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for claim in oldest_claims %}
+                <tr>
+                    <td>{{ claim.created_at|date:"d/m/Y" }}</td>
+                    <td>{{ claim.insurance.name }}</td>
+                    <td>{{ claim.patient_name }}</td>
+                    <td><code>{{ claim.patient_id|default:"—" }}</code></td>
+                    <td class="text-end fw-bold">
+                        {{ claim.balance_due|floatformat:0 }} FCFA
+                    </td>
+                    <td class="text-center">
+                        {% with age=claim.created_at|timesince %}
+                            <small>{{ age }}</small>
+                        {% endwith %}
+                    </td>
+                    <td>
+                        <a href="/admin/insurance/insuranceclaim/{{ claim.id }}/change/"
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        Aucune créance en attente
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

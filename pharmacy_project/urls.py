@@ -26,6 +26,7 @@ urlpatterns = [
     path('', dashboard, name='dashboard'),
     path('accounts/', include('django.contrib.auth.urls')),  # login/logout
     path('sales/', include('sales.urls')),
+    path('insurance/', include('insurance.urls')),
 ]
 
 # Servir les fichiers média en développement

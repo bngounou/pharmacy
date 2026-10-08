@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Créances assurances{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-list-check"></i> Créances assurances</h2>
+        <small class="text-muted">{{ page_obj.paginator.count }} créance{{ page_obj.paginator.count|pluralize }}</small>
+    </div>
+    <a href="{% url 'insurance:dashboard' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Retour au dashboard
+    </a>
+</div>
+
+<!-- Filtres -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Assurance</label>
+                <select name="insurance" class="form-select form-select-sm">
+                    <option value="">— Toutes —</option>
+                    {% for ins in insurances %}
+                        <option value="{{ ins.id }}" {% if insurance_filter == ins.id|stringformat:'s' %}selected{% endif %}>
+                            {{ ins.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Statut</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">— Tous —</option>
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Recherche</label>
+                <input type="text" name="q" value="{{ search }}" class="form-control form-control-sm"
+                       placeholder="Nom patient, n° assuré, n° facture...">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-funnel"></i> Filtrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Assurance</th>
+                    <th>Patient</th>
+                    <th>N° assuré</th>
+                    <th class="text-end">Montant</th>
+                    <th class="text-end">Payé</th>
+                    <th class="text-end">Solde</th>
+                    <th>Statut</th>
+                    <th>Facture</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for claim in page_obj %}
+                <tr>
+                    <td>{{ claim.created_at|date:"d/m/Y" }}</td>
+                    <td>{{ claim.insurance.name }}</td>
+                    <td>{{ claim.patient_name }}</td>
+                    <td><code>{{ claim.patient_id|default:"—" }}</code></td>
+                    <td class="text-end">{{ claim.amount_claimed|floatformat:0 }}</td>
+                    <td class="text-end">{{ claim.amount_paid|floatformat:0 }}</td>
+                    <td class="text-end fw-bold
+                        {% if claim.balance_due > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ claim.balance_due|floatformat:0 }}
+                    </td>
+                    <td>
+                        {% if claim.status == 'paid' %}
+                            <span class="badge bg-success">{{ claim.get_status_display }}</span>
+                        {% elif claim.status == 'pending' %}
+                            <span class="badge bg-secondary">{{ claim.get_status_display }}</span>
+                        {% elif claim.status == 'submitted' %}
+                            <span class="badge bg-info">{{ claim.get_status_display }}</span>
+                        {% elif claim.status == 'partially_paid' %}
+                            <span class="badge bg-warning text-dark">{{ claim.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge bg-danger">{{ claim.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if claim.invoice %}
+                            <a href="{% url 'insurance:invoice_detail' claim.invoice.pk %}">
+                                {{ claim.invoice.invoice_number }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                        Aucune créance ne correspond aux critères
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination pagination-sm mb-0 justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if insurance_filter %}&insurance={{ insurance_filter }}{% endif %}{% if search %}&q={{ search }}{% endif %}">Précédent</a>
+                    </li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if insurance_filter %}&insurance={{ insurance_filter }}{% endif %}{% if search %}&q={{ search }}{% endif %}">Suivant</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
