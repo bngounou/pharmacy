@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Réception — {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Réception</h2>
+        <small class="text-muted">{{ order.order_number }} — {{ order.supplier.name }}</small>
+    </div>
+    <a href="{% url 'inventory:order_detail' order.pk %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Retour
+    </a>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        Pour chaque ligne, saisissez la <strong>quantité reçue</strong> et la <strong>date de péremption</strong>.
+        Laissez la quantité à 0 pour les produits non reçus.
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Médicament</th>
+                        <th class="text-center">Commandé</th>
+                        <th class="text-center">Déjà reçu</th>
+                        <th class="text-center">Solde</th>
+                        <th class="text-center" style="width: 120px;">Qté reçue</th>
+                        <th style="width: 170px;">Péremption</th>
+                        <th style="width: 150px;">N° lot</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr class="{% if item.is_fully_received %}table-light{% endif %}">
+                        <td>
+                            <strong>{{ item.medicine.name }}</strong>
+                            {% if item.is_fully_received %}
+                                <span class="badge bg-success ms-1">✓ Reçu</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ item.quantity_ordered }}</td>
+                        <td class="text-center">{{ item.quantity_received }}</td>
+                        <td class="text-center fw-bold text-warning">{{ item.balance_to_receive }}</td>
+                        <td>
+                            {% if item.is_fully_received %}
+                                <input type="number" class="form-control form-control-sm" disabled value="0">
+                            {% else %}
+                                <input type="number"
+                                       name="qty_{{ item.id }}"
+                                       class="form-control form-control-sm"
+                                       min="0"
+                                       max="{{ item.balance_to_receive }}"
+                                       value="{{ item.balance_to_receive }}"
+                                       data-item="{{ item.id }}">
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not item.is_fully_received %}
+                                <input type="date"
+                                       name="expiry_{{ item.id }}"
+                                       class="form-control form-control-sm"
+                                       value="{{ today|date:'Y-m-d' }}"
+                                       required>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not item.is_fully_received %}
+                                <input type="text"
+                                       name="batch_{{ item.id }}"
+                                       class="form-control form-control-sm"
+                                       placeholder="Auto">
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-info-circle"></i>
+                    <small>Les quantités saisies créeront des entrées de stock automatiquement.</small>
+                </div>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="bi bi-check-circle"></i> Enregistrer la réception
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

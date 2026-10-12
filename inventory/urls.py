@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import order_views
 
 app_name = 'inventory'
 
@@ -35,5 +36,21 @@ urlpatterns = [
     path('expiring/export/', views.expiring_export_csv, name='expiring_export'),
     path('batches/<int:batch_pk>/remove/', views.remove_from_stock, name='remove_from_stock'),
     path('medicines/<int:medicine_pk>/toggle-promotion/', views.toggle_promotion, name='toggle_promotion'),
+
+
+    # Réapprovisionnement
+    path('reorder/', order_views.reorder_dashboard, name='reorder_dashboard'),
+    path('reorder/suggestions/', order_views.reorder_suggestions, name='reorder_suggestions'),
+    path('reorder/create/', order_views.reorder_create_from_suggestions, name='reorder_create'),
+
+    # Bons de commande
+    path('orders/', order_views.order_list, name='order_list'),
+    path('orders/<int:pk>/', order_views.order_detail, name='order_detail'),
+    path('orders/<int:pk>/send/', order_views.order_send, name='order_send'),
+    path('orders/<int:pk>/cancel/', order_views.order_cancel, name='order_cancel'),
+    path('orders/<int:pk>/receive/', order_views.order_receive, name='order_receive'),
+    path('orders/<int:pk>/pdf/', order_views.order_pdf, name='order_pdf'),
+    path('orders/<int:pk>/excel/', order_views.order_excel, name='order_excel'),
+
 
 ]

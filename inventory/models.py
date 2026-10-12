@@ -118,26 +118,34 @@ class Medicine(models.Model):
         super().save(*args, **kwargs)
 
     # ─── Propriétés métier ────────────────────────────────────────
+
     @property
     def total_stock(self):
-        return sum(b.quantity for b in self.batches.all())
+        """Somme du stock sur tous les lots. Force en int."""
+        try:
+            return sum(int(b.quantity) for b in self.batches.all())
+        except (TypeError, ValueError):
+            return 0
 
     @property
     def is_low_stock(self):
-        """Alerte si on est sous le seuil minimum."""
-        return self.total_stock <= self.reorder_level
+        return self.total_stock <= int(self.reorder_level or 0)
 
     @property
     def needs_reorder(self):
-        """Vrai s'il faut réapprovisionner (sous le seuil)."""
-        return self.total_stock <= self.reorder_level
+        return self.total_stock <= int(self.reorder_level or 0)
 
     @property
     def reorder_quantity(self):
         """Quantité à commander pour revenir au niveau recommandé."""
         if not self.needs_reorder:
             return 0
-        return max(0, self.recommended_stock - self.total_stock)
+        try:
+            target = int(self.recommended_stock or 0)
+            current = self.total_stock
+            return max(0, target - current)
+        except (TypeError, ValueError):
+            return 0
 
     @property
     def gross_margin(self):
@@ -260,3 +268,163 @@ class StockRemoval(models.Model):
     def __str__(self):
         return f"{self.quantity} × {self.batch.medicine.name} — {self.get_reason_display()}"
 
+class PurchaseOrder(models.Model):
+    """
+    Bon de commande fournisseur.
+    Généré automatiquement depuis les suggestions de réapprovisionnement
+    ou créé manuellement.
+    """
+    STATUS_CHOICES = [
+        ('draft', "Brouillon"),
+        ('sent', "Envoyée au fournisseur"),
+        ('partial', "Partiellement reçue"),
+        ('received', "Reçue intégralement"),
+        ('cancelled', "Annulée"),
+    ]
+
+    order_number = models.CharField(
+        "N° de commande", max_length=50, unique=True,
+        help_text="Format : CMD-AAAAMM-NNNN"
+    )
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.PROTECT, related_name='purchase_orders',
+        verbose_name="Fournisseur"
+    )
+    status = models.CharField(
+        "Statut", max_length=20, choices=STATUS_CHOICES, default='draft'
+    )
+
+    order_date = models.DateField("Date de commande", default=timezone.now)
+    expected_delivery_date = models.DateField(
+        "Livraison prévue", null=True, blank=True
+    )
+    received_date = models.DateField("Reçue le", null=True, blank=True)
+
+    total_amount = models.DecimalField(
+        "Montant total", max_digits=12, decimal_places=2, default=0
+    )
+
+    notes = models.TextField("Notes", blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, verbose_name="Créée par"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Bon de commande"
+        verbose_name_plural = "Bons de commande"
+        ordering = ['-order_date', '-id']
+        indexes = [
+            models.Index(fields=['status', 'supplier']),
+        ]
+
+    @property
+    def items_count(self):
+        return self.items.count()
+
+    @property
+    def total_ordered(self):
+        return sum(item.quantity_ordered for item in self.items.all())
+
+    @property
+    def total_received(self):
+        return sum(item.quantity_received for item in self.items.all())
+
+    @property
+    def is_fully_received(self):
+        return all(item.is_fully_received for item in self.items.all())
+
+    @property
+    def progress_pct(self):
+        if not self.total_ordered:
+            return 0
+        return int(self.total_received / self.total_ordered * 100)
+
+    def refresh_totals(self):
+        """Recalcule le montant total depuis les lignes."""
+        total = sum(
+            (item.subtotal for item in self.items.all()),
+            Decimal('0.00')
+        )
+        self.total_amount = total
+
+    def refresh_status(self):
+        """Met à jour le statut selon les quantités reçues."""
+        if self.status in ('cancelled',):
+            return
+        if self.items.filter(quantity_received__gt=0).exists():
+            if self.is_fully_received:
+                self.status = 'received'
+                if not self.received_date:
+                    self.received_date = timezone.now().date()
+            else:
+                self.status = 'partial'
+
+    @classmethod
+    def generate_order_number(cls):
+        """Génère un numéro séquentiel CMD-AAAAMM-NNNN."""
+        now = timezone.now()
+        prefix = f"CMD-{now.year}{now.month:02d}-"
+
+        last = cls.objects.filter(
+            order_number__startswith=prefix
+        ).order_by('-order_number').first()
+
+        if last:
+            try:
+                last_num = int(last.order_number.split('-')[-1])
+                next_num = last_num + 1
+            except (ValueError, IndexError):
+                next_num = 1
+        else:
+            next_num = 1
+
+        return f"{prefix}{next_num:04d}"
+
+    def __str__(self):
+        return f"{self.order_number} — {self.supplier.name}"
+
+
+class PurchaseOrderItem(models.Model):
+    """Ligne d'un bon de commande."""
+    order = models.ForeignKey(
+        PurchaseOrder, on_delete=models.CASCADE, related_name='items',
+        verbose_name="Bon de commande"
+    )
+    medicine = models.ForeignKey(
+        Medicine, on_delete=models.PROTECT,
+        verbose_name="Médicament"
+    )
+    quantity_ordered = models.PositiveIntegerField("Quantité commandée")
+    quantity_received = models.PositiveIntegerField(
+        "Quantité reçue", default=0
+    )
+    unit_price = models.DecimalField(
+        "Prix unitaire d'achat", max_digits=10, decimal_places=2,
+        help_text="Prix d'achat convenu avec le fournisseur."
+    )
+    subtotal = models.DecimalField(
+        "Sous-total", max_digits=12, decimal_places=2, default=0
+    )
+
+    class Meta:
+        verbose_name = "Ligne de commande"
+        verbose_name_plural = "Lignes de commande"
+        ordering = ['medicine__name']
+
+    @property
+    def is_fully_received(self):
+        return self.quantity_received >= self.quantity_ordered
+
+    @property
+    def balance_to_receive(self):
+        return max(0, self.quantity_ordered - self.quantity_received)
+
+    def save(self, *args, **kwargs):
+        self.subtotal = self.quantity_ordered * self.unit_price
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.quantity_ordered} × {self.medicine.name}"

@@ -80,11 +80,22 @@
                                 <i class="bi bi-hourglass-split text-danger"></i> Alertes péremption
                             </a>
                         </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item" href="{% url 'inventory:reorder_dashboard' %}">
+                                <i class="bi bi-cart-plus text-primary"></i> Réapprovisionnement
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{% url 'inventory:order_list' %}">
+                                <i class="bi bi-receipt"></i> Bons de commande
+                            </a>
+                        </li>
                     </ul>
                 </li>
                 {% endif %}
 
-                <li class="nav-item">
+                <li class="napython manage.py shellv-item">
                     <a class="nav-link" href="#">
                         <i class="bi bi-receipt"></i> Ventes
                     </a>

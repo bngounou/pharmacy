@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ order.order_number }}</title>
+    <style>
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #212529; }
+
+        .header-table { width: 100%; border-bottom: 3px solid #0d6efd; margin-bottom: 20px; }
+        .header-table td { vertical-align: top; padding: 5px; }
+        .pharmacy-name { color: #0d6efd; font-size: 20pt; font-weight: bold; margin: 0; }
+        .pharmacy-sub { color: #6c757d; font-size: 9pt; }
+        .order-title { color: #0d6efd; font-size: 14pt; font-weight: bold; text-align: right; }
+        .order-meta { text-align: right; font-size: 9pt; color: #6c757d; }
+
+        .supplier-box { background-color: #f8f9fa; border-left: 4px solid #0d6efd; padding: 10px 15px; margin-bottom: 15px; }
+        .supplier-box h3 { margin: 0 0 4px 0; font-size: 12pt; }
+        .supplier-box p { margin: 2px 0; font-size: 9pt; color: #6c757d; }
+
+        table.items { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        table.items th { background-color: #495057; color: white; padding: 6px 8px; text-align: left; font-size: 9pt; }
+        table.items td { padding: 5px 8px; border-bottom: 1px solid #dee2e6; font-size: 9pt; }
+        .text-end { text-align: right; }
+        .text-center { text-align: center; }
+
+        table.total-table { width: 100%; margin-top: 10px; }
+        .total-cell { background-color: #d1e7dd; font-weight: bold; padding: 8px 12px; font-size: 11pt; border-top: 2px solid #0d6efd; border-bottom: 2px solid #0d6efd; }
+
+        table.signatures { width: 100%; margin-top: 50px; }
+        table.signatures td { width: 50%; text-align: center; padding-top: 40px; font-size: 9pt; }
+        .signature-line { border-top: 1px solid #212529; width: 70%; margin: 5px auto 0 auto; padding-top: 5px; }
+
+        .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #dee2e6; font-size: 8pt; color: #6c757d; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <table class="header-table">
+        <tr>
+            <td style="width: 60%;">
+                <div class="pharmacy-name">PharmaGest</div>
+                <p class="pharmacy-sub">Votre pharmacie de confiance</p>
+                <p class="pharmacy-sub">Tél : +237 XXX XXX XXX</p>
+            </td>
+            <td style="width: 40%;">
+                <div class="order-title">BON DE COMMANDE</div>
+                <div class="order-meta">
+                    <strong>{{ order.order_number }}</strong><br>
+                    Date : {{ order.order_date|date:"d/m/Y" }}<br>
+                    {% if order.expected_delivery_date %}
+                    Livraison : {{ order.expected_delivery_date|date:"d/m/Y" }}
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="supplier-box">
+        <h3>{{ order.supplier.name }}</h3>
+        {% if order.supplier.contact_person %}<p>Contact : {{ order.supplier.contact_person }}</p>{% endif %}
+        <p>Téléphone : {{ order.supplier.phone|default:"—" }}</p>
+        {% if order.supplier.email %}<p>Email : {{ order.supplier.email }}</p>{% endif %}
+    </div>
+
+    <table class="items">
+        <thead>
+            <tr>
+                <th style="width: 45%;">Médicament</th>
+                <th style="width: 15%;" class="text-center">Qté</th>
+                <th style="width: 20%;" class="text-end">Prix unitaire</th>
+                <th style="width: 20%;" class="text-end">Sous-total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.medicine.name }}</td>
+                <td class="text-center">{{ item.quantity_ordered }}</td>
+                <td class="text-end">{{ item.unit_price|floatformat:2 }} FCFA</td>
+                <td class="text-end">{{ item.subtotal|floatformat:2 }} FCFA</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="total-table">
+        <tr>
+            <td style="width: 60%;">&nbsp;</td>
+            <td class="total-cell">TOTAL :</td>
+            <td class="total-cell text-end">{{ order.total_amount|floatformat:2 }} FCFA</td>
+        </tr>
+    </table>
+
+    <table class="signatures">
+        <tr>
+            <td>
+                <div>Le Pharmacien</div>
+                <div class="signature-line">&nbsp;</div>
+            </td>
+            <td>
+                <div>Cachet & signature</div>
+                <div class="signature-line">&nbsp;</div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="footer">
+        Bon généré le {{ today|date:"d/m/Y à H:i" }} — PharmaGest
+    </div>
+
+</body>
+</html>

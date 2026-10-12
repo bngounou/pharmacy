@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Category, Supplier, Medicine, Batch
+from .models import Medicine, Batch, Category, Supplier, StockRemoval, PurchaseOrder, PurchaseOrderItem
+
 
 
 @admin.register(Category)
@@ -111,3 +112,27 @@ class StockRemovalAdmin(admin.ModelAdmin):
     search_fields = ('batch__medicine__name', 'notes')
     readonly_fields = ('removed_at', 'total_loss')
     date_hierarchy = 'removed_at'
+
+
+class PurchaseOrderItemInline(admin.TabularInline):
+    model = PurchaseOrderItem
+    extra = 0
+    fields = ('medicine', 'quantity_ordered', 'quantity_received', 'unit_price', 'subtotal')
+    readonly_fields = ('subtotal',)
+
+
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+    list_display = (
+        'order_number', 'supplier', 'status', 'order_date',
+        'expected_delivery_date', 'total_amount', 'progress_display'
+    )
+    list_filter = ('status', 'supplier', 'order_date')
+    search_fields = ('order_number', 'supplier__name')
+    readonly_fields = ('created_at', 'updated_at', 'total_amount')
+    inlines = [PurchaseOrderItemInline]
+    date_hierarchy = 'order_date'
+
+    @admin.display(description="Progression")
+    def progress_display(self, obj):
+        return f"{obj.progress_pct}%"
