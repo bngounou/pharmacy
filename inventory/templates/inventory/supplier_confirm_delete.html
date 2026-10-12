@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Supprimer {{ object.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Suppression</h4>
+            </div>
+            <div class="card-body">
+                <p>Confirmer la <strong>suppression</strong> du fournisseur :</p>
+                <h5>{{ object.name }}</h5>
+                <p class="text-muted">
+                    Les médicaments liés à ce fournisseur resteront en stock
+                    mais n'auront plus de fournisseur associé.
+                </p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Supprimer
+                        </button>
+                        <a href="{% url 'inventory:supplier_list' %}" class="btn btn-outline-secondary">Annuler</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

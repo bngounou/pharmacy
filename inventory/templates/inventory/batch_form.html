@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Entrée de stock — {{ medicine.name }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Ajouter du stock</h4>
+            </div>
+            <div class="card-body">
+                <p class="mb-3"><strong>{{ medicine.name }}</strong> — Stock actuel : {{ medicine.total_stock }}</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Quantité <span class="text-danger">*</span></label>
+                        {{ form.quantity }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date de péremption <span class="text-danger">*</span></label>
+                        {{ form.expiry_date }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date de réception</label>
+                        {{ form.received_date }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">N° de lot</label>
+                        {{ form.batch_number }}
+                        <div class="form-text small">Optionnel — généré automatiquement si vide.</div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Enregistrer
+                        </button>
+                        <a href="{% url 'inventory:medicine_detail' medicine.pk %}" class="btn btn-outline-secondary">Annuler</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

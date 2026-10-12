@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}{% if object %}Modifier{% else %}Nouveau{% endif %} médicament{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        <i class="bi bi-capsule"></i>
+        {% if object %}Modifier « {{ object.name }} »{% else %}Nouveau médicament{% endif %}
+    </h2>
+    <a href="{% if object %}{% url 'inventory:medicine_detail' object.pk %}{% else %}{% url 'inventory:medicine_list' %}{% endif %}"
+       class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Retour
+    </a>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-3">
+        <!-- Colonne gauche : infos -->
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Informations générales</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Nom commercial <span class="text-danger">*</span></label>
+                            {{ form.name }}
+                            {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Code-barres</label>
+                            {{ form.barcode }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nom générique / DCI</label>
+                            {{ form.generic_name }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Catégorie <span class="text-danger">*</span></label>
+                            {{ form.category }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Fournisseur</label>
+                            {{ form.supplier }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            {{ form.description }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Image</label>
+                            {{ form.image }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Prix</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Prix d'achat (FCFA)</label>
+                            {{ form.purchase_price }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Prix comptant (FCFA) <span class="text-danger">*</span></label>
+                            {{ form.cash_price }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Prix assurance (FCFA)</label>
+                            {{ form.insurance_price }}
+                            <div class="form-text small">{{ form.insurance_price.help_text }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Gestion du stock</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Seuil d'alerte</label>
+                            {{ form.reorder_level }}
+                            <div class="form-text small">{{ form.reorder_level.help_text }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Stock recommandé</label>
+                            {{ form.recommended_stock }}
+                            <div class="form-text small">{{ form.recommended_stock.help_text }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Colonne droite : options -->
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Options</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check mb-2">
+                        {{ form.requires_prescription }}
+                        <label class="form-check-label" for="{{ form.requires_prescription.id_for_label }}">
+                            Ordonnance requise
+                        </label>
+                    </div>
+                    <div class="form-check mb-2">
+                        {{ form.insurance_eligible }}
+                        <label class="form-check-label" for="{{ form.insurance_eligible.id_for_label }}">
+                            Éligible assurance
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                            Actif (visible au POS)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-circle"></i> Enregistrer
+                </button>
+                <a href="{% url 'inventory:medicine_list' %}" class="btn btn-outline-secondary">
+                    Annuler
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

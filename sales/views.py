@@ -139,6 +139,8 @@ def create_sale(request):
                 # Prix : insurance_price si assurance ET médicament éligible
                 if insurance and medicine.insurance_eligible:
                     unit_price = medicine.insurance_price or medicine.cash_price
+                elif medicine.on_promotion and medicine.promotion_discount_pct > 0:
+                    unit_price = medicine.promotion_price
                 else:
                     unit_price = medicine.cash_price
 

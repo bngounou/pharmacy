@@ -51,6 +51,23 @@
             </div>
         </div>
     </div>
+    <div class="col-md-3">
+    <a href="{% url 'inventory:expiring_dashboard' %}" class="text-decoration-none">
+        <div class="card stat-card danger h-100">
+            <div class="card-body">
+                <div class="stat-label">Alertes péremption</div>
+                <div class="stat-value text-danger">{{ expiring_30_count }}</div>
+                <small class="text-muted">
+                    {% if expired_count > 0 %}
+                        + {{ expired_count }} déjà périmés
+                    {% else %}
+                        expirent dans 30j
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </a>
+</div>
 </div>
 
 <div class="row g-3">

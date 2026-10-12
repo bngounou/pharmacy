@@ -56,9 +56,9 @@ class MedicineAdmin(admin.ModelAdmin):
     list_display = (
         'name', 'category', 'purchase_price', 'cash_price',
         'total_stock', 'is_low_stock', 'reorder_quantity_display',
-        'insurance_eligible', 'is_active',
+        'insurance_eligible', 'on_promotion', 'is_active',
     )
-    list_filter = ('category', 'requires_prescription', 'insurance_eligible', 'is_active')
+    list_filter = ('category', 'requires_prescription', 'insurance_eligible', 'on_promotion', 'is_active')
     search_fields = ('name', 'generic_name', 'barcode')
     inlines = [BatchInline]
     list_per_page = 25
@@ -101,3 +101,13 @@ class MedicineAdmin(admin.ModelAdmin):
         return "—"
 
 
+from .models import Medicine, Batch, Category, Supplier, StockRemoval
+
+
+@admin.register(StockRemoval)
+class StockRemovalAdmin(admin.ModelAdmin):
+    list_display = ('removed_at', 'batch', 'quantity', 'reason', 'total_loss', 'removed_by')
+    list_filter = ('reason', 'removed_at')
+    search_fields = ('batch__medicine__name', 'notes')
+    readonly_fields = ('removed_at', 'total_loss')
+    date_hierarchy = 'removed_at'

@@ -48,3 +48,8 @@ can_view_reports = require_permission(
     'can_view_reports',
     "Accès refusé : vous n'êtes pas autorisé à voir les rapports."
 )
+
+can_manage_inventory = require_permission(
+    'can_manage_inventory',
+    "Accès refusé : vous n'êtes pas autorisé à gérer l'inventaire."
+)

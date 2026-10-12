@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Fournisseurs{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-truck"></i> Fournisseurs</h2>
+        <small class="text-muted">{{ suppliers|length }} fournisseur{{ suppliers|length|pluralize }}</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'inventory:medicine_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Médicaments
+        </a>
+        <a href="{% url 'inventory:supplier_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nouveau fournisseur
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nom</th>
+                    <th>Contact</th>
+                    <th>Téléphone</th>
+                    <th>Email</th>
+                    <th class="text-center">Médicaments</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sup in suppliers %}
+                <tr>
+                    <td><strong>{{ sup.name }}</strong></td>
+                    <td><small>{{ sup.contact_person|default:"—" }}</small></td>
+                    <td>{{ sup.phone }}</td>
+                    <td><small>{{ sup.email|default:"—" }}</small></td>
+                    <td class="text-center">
+                        <a href="{% url 'inventory:medicine_list' %}?supplier={{ sup.id }}"
+                           class="badge bg-primary text-decoration-none">
+                            {{ sup.medicine_count }}
+                        </a>
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'inventory:supplier_update' sup.pk %}"
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'inventory:supplier_delete' sup.pk %}"
+                           class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="bi bi-truck fs-3 d-block mb-2"></i>
+                        Aucun fournisseur. <a href="{% url 'inventory:supplier_create' %}">Créer le premier</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -65,18 +65,25 @@
                 </li>
                 {% endif %}
 
+                {% if user.can_manage_inventory or user.is_superuser %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-box-seam"></i> Inventaire
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#">Médicaments</a></li>
-                        <li><a class="dropdown-item" href="#">Catégories</a></li>
-                        <li><a class="dropdown-item" href="#">Fournisseurs</a></li>
+                        <li><a class="dropdown-item" href="{% url 'inventory:medicine_list' %}">Médicaments</a></li>
+                        <li><a class="dropdown-item" href="{% url 'inventory:category_list' %}">Catégories</a></li>
+                        <li><a class="dropdown-item" href="{% url 'inventory:supplier_list' %}">Fournisseurs</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#">Lots & péremption</a></li>
+                        <li>
+                            <a class="dropdown-item" href="{% url 'inventory:expiring_dashboard' %}">
+                                <i class="bi bi-hourglass-split text-danger"></i> Alertes péremption
+                            </a>
+                        </li>
                     </ul>
                 </li>
+                {% endif %}
+
                 <li class="nav-item">
                     <a class="nav-link" href="#">
                         <i class="bi bi-receipt"></i> Ventes

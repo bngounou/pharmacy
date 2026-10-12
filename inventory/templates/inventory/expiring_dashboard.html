@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Alertes péremption{% endblock %}
+
+{% block extra_css %}
+<style>
+    .alert-card {
+        border-left: 5px solid;
+        transition: transform 0.15s;
+        cursor: pointer;
+    }
+    .alert-card:hover { transform: translateY(-2px); }
+    .alert-card.expired  { border-left-color: #212529; background: #f8f9fa; }
+    .alert-card.urgent   { border-left-color: #dc3545; }
+    .alert-card.warning  { border-left-color: #fd7e14; }
+    .alert-card.caution  { border-left-color: #ffc107; }
+
+    .alert-count {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .batch-row.urgent { background-color: #fff5f5; }
+    .batch-row.warning { background-color: #fff8f0; }
+    .batch-row.caution { background-color: #fffbf0; }
+    .batch-row.expired { background-color: #f1f3f5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-hourglass-split"></i> Alertes péremption</h2>
+        <small class="text-muted">Surveillance des dates d'expiration du stock</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'inventory:expiring_list' %}?days=90" class="btn btn-outline-primary">
+            <i class="bi bi-list"></i> Vue détaillée
+        </a>
+        <a href="{% url 'inventory:expiring_export' %}?days=90" class="btn btn-outline-success">
+            <i class="bi bi-download"></i> Export CSV
+        </a>
+    </div>
+</div>
+
+<!-- 4 cartes de synthèse -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="alert-card expired card h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Déjà périmés</div>
+                <div class="alert-count text-dark">{{ expired.count }}</div>
+                <div class="small mt-1">
+                    {{ expired.total_qty }} unités<br>
+                    Perte : <strong>{{ expired.value|floatformat:0 }} FCFA</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="alert-card urgent card h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Expirent dans &lt; 30 jours</div>
+                <div class="alert-count text-danger">{{ soon_30.count }}</div>
+                <div class="small mt-1">
+                    {{ soon_30.total_qty }} unités<br>
+                    Valeur : <strong>{{ soon_30.value|floatformat:0 }} FCFA</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="alert-card warning card h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">30 à 60 jours</div>
+                <div class="alert-count text-warning">{{ soon_60.count }}</div>
+                <div class="small mt-1">
+                    {{ soon_60.total_qty }} unités<br>
+                    Valeur : <strong>{{ soon_60.value|floatformat:0 }} FCFA</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="alert-card caution card h-100">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">60 à 90 jours</div>
+                <div class="alert-count">{{ soon_90.count }}</div>
+                <div class="small mt-1">
+                    {{ soon_90.total_qty }} unités<br>
+                    Valeur : <strong>{{ soon_90.value|floatformat:0 }} FCFA</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Déjà périmés -->
+{% if expired.batches %}
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0"><i class="bi bi-x-octagon"></i> Déjà périmés ({{ expired.count }})</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Médicament</th>
+                    <th>N° lot</th>
+                    <th class="text-center">Quantité</th>
+                    <th>Péremption</th>
+                    <th class="text-center">Retard</th>
+                    <th class="text-end">Valeur</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in expired.batches %}
+                <tr class="batch-row expired">
+                    <td>
+                        <a href="{% url 'inventory:medicine_detail' b.medicine.pk %}">
+                            {{ b.medicine.name }}
+                        </a>
+                        {% if b.medicine.on_promotion %}
+                            <span class="badge bg-info">Promo</span>
+                        {% endif %}
+                    </td>
+                    <td><code>{{ b.batch_number }}</code></td>
+                    <td class="text-center">{{ b.quantity }}</td>
+                    <td>{{ b.expiry_date|date:"d/m/Y" }}</td>
+                    <td class="text-center text-danger fw-bold">+{{ b.days_until_expiry|cut:"-" }}j</td>
+                    <td class="text-end">{{ b.quantity|floatformat:0 }} × {{ b.medicine.purchase_price|floatformat:0 }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#removeModal{{ b.pk }}">
+                            <i class="bi bi-trash"></i> Retirer
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Proches de l'expiration -->
+{% for tranche, label, color in soon_30|yesno:","|slice:":0"|make_list %}{% endfor %}
+
+<div class="card mb-4">
+    <div class="card-header bg-danger text-white">
+        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Expirent dans moins de 30 jours ({{ soon_30.count }})</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Médicament</th>
+                    <th>Catégorie</th>
+                    <th>N° lot</th>
+                    <th class="text-center">Quantité</th>
+                    <th>Péremption</th>
+                    <th class="text-center">Jours</th>
+                    <th class="text-end">Valeur</th>
+                    <th class="text-center">Promo</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in soon_30.batches %}
+                <tr class="batch-row urgent">
+                    <td><strong>{{ b.medicine.name }}</strong></td>
+                    <td><small>{{ b.medicine.category.name }}</small></td>
+                    <td><code>{{ b.batch_number }}</code></td>
+                    <td class="text-center">{{ b.quantity }}</td>
+                    <td>{{ b.expiry_date|date:"d/m/Y" }}</td>
+                    <td class="text-center">
+                        <span class="badge bg-danger">{{ b.days_until_expiry }}j</span>
+                    </td>
+                    <td class="text-end">{{ b.quantity|floatformat:0 }} × {{ b.medicine.purchase_price|floatformat:0 }}</td>
+                    <td class="text-center">
+                        {% if b.medicine.on_promotion %}
+                            <span class="badge bg-info">-{{ b.medicine.promotion_discount_pct|floatformat:0 }}%</span>
+                            <form method="post" action="{% url 'inventory:toggle_promotion' b.medicine.pk %}"
+                                  class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-0">
+                                    <i class="bi bi-x-circle"></i>
+                                </button>
+                            </form>
+                        {% else %}
+                            <form method="post" action="{% url 'inventory:toggle_promotion' b.medicine.pk %}"
+                                  class="d-inline">
+                                {% csrf_token %}
+                                <input type="number" name="discount_pct" value="20" min="1" max="90"
+                                       style="width:50px" class="form-control form-control-sm d-inline"
+                                       title="Pourcentage de remise">
+                                <button type="submit" class="btn btn-sm btn-outline-info">
+                                    Promo
+                                </button>
+                            </form>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#removeModal{{ b.pk }}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 30-60 jours -->
+<div class="card mb-4">
+    <div class="card-header" style="background-color: #fd7e14; color: white;">
+        <h5 class="mb-0"><i class="bi bi-clock"></i> Expirent dans 30 à 60 jours ({{ soon_60.count }})</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Médicament</th>
+                    <th>N° lot</th>
+                    <th class="text-center">Quantité</th>
+                    <th>Péremption</th>
+                    <th class="text-center">Jours</th>
+                    <th class="text-end">Valeur</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in soon_60.batches %}
+                <tr>
+                    <td>{{ b.medicine.name }}</td>
+                    <td><code>{{ b.batch_number }}</code></td>
+                    <td class="text-center">{{ b.quantity }}</td>
+                    <td>{{ b.expiry_date|date:"d/m/Y" }}</td>
+                    <td class="text-center">
+                        <span class="badge bg-warning text-dark">{{ b.days_until_expiry }}j</span>
+                    </td>
+                    <td class="text-end">{{ b.quantity|floatformat:0 }} × {{ b.medicine.purchase_price|floatformat:0 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-3">Aucun</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 60-90 jours -->
+<div class="card mb-4">
+    <div class="card-header bg-warning">
+        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Expirent dans 60 à 90 jours ({{ soon_90.count }})</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Médicament</th>
+                    <th>N° lot</th>
+                    <th class="text-center">Quantité</th>
+                    <th>Péremption</th>
+                    <th class="text-center">Jours</th>
+                    <th class="text-end">Valeur</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in soon_90.batches %}
+                <tr>
+                    <td>{{ b.medicine.name }}</td>
+                    <td><code>{{ b.batch_number }}</code></td>
+                    <td class="text-center">{{ b.quantity }}</td>
+                    <td>{{ b.expiry_date|date:"d/m/Y" }}</td>
+                    <td class="text-center">
+                        <span class="badge bg-secondary">{{ b.days_until_expiry }}j</span>
+                    </td>
+                    <td class="text-end">{{ b.quantity|floatformat:0 }} × {{ b.medicine.purchase_price|floatformat:0 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-3">Aucun</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modales de retrait -->
+{% for b in expired.batches %}
+    {% include 'inventory/_remove_modal.html' with batch=b %}
+{% endfor %}
+{% for b in soon_30.batches %}
+    {% include 'inventory/_remove_modal.html' with batch=b %}
+{% endfor %}
+{% endblock %}

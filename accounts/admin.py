@@ -21,7 +21,7 @@ class CustomUserAdmin(UserAdmin):
             'fields': ('role', 'phone'),
         }),
         ("Permissions granulaires", {
-            'fields': ('can_access_cash_closure', 'can_manage_insurance', 'can_view_reports'),
+            'fields': ('can_access_cash_closure', 'can_manage_insurance', 'can_view_reports', 'can_manage_inventory'),
             'description': "Ces permissions sont indépendantes du rôle. "
                            "Un caissier peut par exemple avoir accès à la clôture de caisse.",
         }),

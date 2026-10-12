@@ -1,7 +1,8 @@
 from decimal import Decimal
 from django.db import models
 from django.utils import timezone
-
+from django.conf import settings
+from decimal import Decimal
 
 class Category(models.Model):
     name = models.CharField("Nom", max_length=100, unique=True)
@@ -77,6 +78,21 @@ class Medicine(models.Model):
     requires_prescription = models.BooleanField("Ordonnance requise", default=False)
     is_active = models.BooleanField("Actif", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Promotion
+    on_promotion = models.BooleanField("En promotion", default=False)
+    promotion_discount_pct = models.DecimalField(
+        "Remise promotion (%)", max_digits=5, decimal_places=2, default=0,
+        help_text="Pourcentage de remise appliqué au prix comptant (0-100)."
+    )
+
+    @property
+    def promotion_price(self):
+        """Prix comptant avec promotion appliquée."""
+        if not self.on_promotion or self.promotion_discount_pct <= 0:
+            return self.cash_price
+        discount = self.cash_price * (self.promotion_discount_pct / 100)
+        return (self.cash_price - discount).quantize(Decimal('0.01'))
 
     insurance_eligible = models.BooleanField(
         "Éligible assurance", default=True,
@@ -183,12 +199,64 @@ class Batch(models.Model):
 
     @property
     def is_expired(self):
+        if not self.expiry_date:
+            return False
         return self.expiry_date < timezone.now().date()
 
     @property
     def days_until_expiry(self):
+        if not self.expiry_date:
+            return 999999  # pas de date → pas d'alerte
         return (self.expiry_date - timezone.now().date()).days
 
     def __str__(self):
         suffix = "" if self.batch_number.startswith("AUTO-") else f" — Lot {self.batch_number}"
         return f"{self.medicine.name} ({self.quantity} u., exp. {self.expiry_date:%d/%m/%Y}){suffix}"
+
+class StockRemoval(models.Model):
+    """
+    Retrait de stock — traçabilité des pertes (périmés, endommagés, rappels).
+    """
+    REASON_CHOICES = [
+        ('expired', "Périmé"),
+        ('damaged', "Endommagé / cassé"),
+        ('recall', "Rappel fournisseur"),
+        ('return', "Retour fournisseur"),
+        ('loss', "Perte / vol"),
+        ('other', "Autre"),
+    ]
+
+    batch = models.ForeignKey(
+        Batch, on_delete=models.PROTECT, related_name='removals',
+        verbose_name="Entrée de stock"
+    )
+    quantity = models.PositiveIntegerField("Quantité retirée")
+    reason = models.CharField(
+        "Motif", max_length=20, choices=REASON_CHOICES
+    )
+    unit_cost = models.DecimalField(
+        "Coût unitaire (achat)", max_digits=10, decimal_places=2,
+        help_text="Prix d'achat au moment du retrait (figé)."
+    )
+    total_loss = models.DecimalField(
+        "Perte totale", max_digits=12, decimal_places=2, default=0
+    )
+    notes = models.TextField("Notes", blank=True)
+    removed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, verbose_name="Retiré par"
+    )
+    removed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Retrait de stock"
+        verbose_name_plural = "Retraits de stock"
+        ordering = ['-removed_at']
+
+    def save(self, *args, **kwargs):
+        self.total_loss = self.quantity * self.unit_cost
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.quantity} × {self.batch.medicine.name} — {self.get_reason_display()}"
+

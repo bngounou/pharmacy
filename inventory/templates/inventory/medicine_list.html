@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Inventaire — Médicaments{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-capsule"></i> Médicaments</h2>
+        <small class="text-muted">{{ total_count }} référence{{ total_count|pluralize }} au total</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'inventory:category_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-tags"></i> Catégories
+        </a>
+        <a href="{% url 'inventory:supplier_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-truck"></i> Fournisseurs
+        </a>
+        <a href="{% url 'inventory:medicine_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nouveau médicament
+        </a>
+    </div>
+</div>
+
+<!-- Filtres -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Recherche</label>
+                <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+                       placeholder="Nom, DCI, code-barres...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Catégorie</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">— Toutes —</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if category_filter == cat.id|stringformat:'s' %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Fournisseur</label>
+                <select name="supplier" class="form-select form-select-sm">
+                    <option value="">— Tous —</option>
+                    {% for sup in suppliers %}
+                        <option value="{{ sup.id }}" {% if supplier_filter == sup.id|stringformat:'s' %}selected{% endif %}>
+                            {{ sup.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Stock</label>
+                <select name="stock" class="form-select form-select-sm">
+                    <option value="">— Tous —</option>
+                    <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>⚠️ Stock faible</option>
+                    <option value="zero" {% if stock_filter == 'zero' %}selected{% endif %}>❌ Rupture</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small mb-1">Statut</label>
+                <select name="active" class="form-select form-select-sm">
+                    <option value="yes" {% if active_filter == 'yes' %}selected{% endif %}>Actifs</option>
+                    <option value="no" {% if active_filter == 'no' %}selected{% endif %}>Inactifs</option>
+                    <option value="all" {% if active_filter == 'all' %}selected{% endif %}>Tous</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-funnel"></i> Filtrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nom</th>
+                    <th>Catégorie</th>
+                    <th class="text-end">Prix comptant</th>
+                    <th class="text-end">Prix assurance</th>
+                    <th class="text-center">Stock</th>
+                    <th class="text-center">Marge</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for med in medicines %}
+                <tr class="{% if not med.is_active %}table-secondary{% endif %}">
+                    <td>
+                        <strong>{{ med.name }}</strong>
+                        {% if med.requires_prescription %}
+                            <span class="badge bg-warning text-dark ms-1">Rx</span>
+                        {% endif %}
+                        {% if not med.is_active %}
+                            <span class="badge bg-secondary ms-1">Inactif</span>
+                        {% endif %}
+                        {% if med.generic_name %}
+                            <br><small class="text-muted">{{ med.generic_name }}</small>
+                        {% endif %}
+                    </td>
+                    <td><small>{{ med.category.name }}</small></td>
+                    <td class="text-end">{{ med.cash_price|floatformat:0 }} FCFA</td>
+                    <td class="text-end text-muted">{{ med.insurance_price|floatformat:0 }} FCFA</td>
+                    <td class="text-center">
+                        {% if med.total_stock_annot == 0 %}
+                            <span class="badge bg-danger">0</span>
+                        {% elif med.total_stock_annot <= med.reorder_level %}
+                            <span class="badge bg-warning text-dark">{{ med.total_stock_annot }}</span>
+                        {% else %}
+                            <span class="badge bg-success">{{ med.total_stock_annot }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <small>{{ med.gross_margin|floatformat:0 }} FCFA</small>
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'inventory:medicine_detail' med.pk %}"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="{% url 'inventory:medicine_update' med.pk %}"
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                        Aucun médicament ne correspond aux critères
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination pagination-sm mb-0 justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}">Précédent</a>
+                    </li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}">Suivant</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

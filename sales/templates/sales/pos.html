@@ -36,7 +36,7 @@
                             data-name="{{ med.name|lower }}"
                             data-generic="{{ med.generic_name|lower }}"
                             data-barcode="{{ med.barcode|default:'' }}"
-                            data-price="{{ med.cash_price|stringformat:'f' }}"
+                            data-price="{% if med.on_promotion %}{{ med.promotion_price|stringformat:'f' }}{% else %}{{ med.cash_price|stringformat:'f' }}{% endif %}"
                             data-insurance-price="{{ med.insurance_price|default:med.cash_price|stringformat:'f' }}"
                             data-stock="{{ med.total_stock }}"
                             data-eligible="{{ med.insurance_eligible|yesno:'1,0' }}">
@@ -52,7 +52,15 @@
                             </small>
                         </div>
                         <div class="text-end">
-                            <div class="fw-bold text-success">{{ med.cash_price|floatformat:0 }} FCFA</div>
+                            {% if med.on_promotion %}
+                                <div class="fw-bold text-danger">
+                                    <s class="text-muted small">{{ med.cash_price|floatformat:0 }}</s>
+                                    {{ med.promotion_price|floatformat:0 }} FCFA
+                                    <span class="badge bg-danger">-{{ med.promotion_discount_pct|floatformat:0 }}%</span>
+                                </div>
+                            {% else %}
+                                <div class="fw-bold text-success">{{ med.cash_price|floatformat:0 }} FCFA</div>
+                            {% endif %}
                             <small class="{% if med.is_low_stock %}text-danger{% else %}text-muted{% endif %}">
                                 Stock : {{ med.total_stock }}
                             </small>
