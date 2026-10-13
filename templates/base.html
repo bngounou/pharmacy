@@ -61,15 +61,6 @@
                     </a>
                 </li>
                 {% endif %}
-
-                {% if user.can_view_reports or user.is_superuser %}
-                <li class="nav-item">
-                    <a class="nav-link" href="#">
-                        <i class="bi bi-bar-chart"></i> Rapports
-                    </a>
-                </li>
-                {% endif %}
-
                 {% if user.can_manage_inventory or user.is_superuser %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
@@ -99,15 +90,17 @@
                     </ul>
                 </li>
                 {% endif %}
-
-                <li class="napython manage.py shellv-item">
-                    <a class="nav-link" href="#">
-                        <i class="bi bi-receipt"></i> Ventes
-                    </a>
                     {% if user.can_view_reports or user.is_superuser %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'sales:cash_report' %}">
                             <i class="bi bi-cash-stack"></i> Rapport caisse
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% if user.can_view_reports or user.is_superuser %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'sales:sales_report' %}">
+                            <i class="bi bi-graph-up"></i> Rapports
                         </a>
                     </li>
                     {% endif %}

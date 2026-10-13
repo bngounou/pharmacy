@@ -1,0 +1,516 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Rapport de ventes{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-left: 4px solid var(--bs-primary);
+        transition: transform 0.15s;
+    }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #6c757d;
+        letter-spacing: 0.5px;
+    }
+    .delta-up   { color: #198754; font-weight: 600; }
+    .delta-down { color: #dc3545; font-weight: 600; }
+    .delta-flat { color: #6c757d; }
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+    @media print {
+        .no-print { display: none !important; }
+        .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête + sélecteur de période -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-graph-up"></i> Rapport de ventes</h2>
+        <small class="text-muted">
+            {{ start_date|date:"d/m/Y" }} → {{ end_date|date:"d/m/Y" }}
+            ({{ start_date|timesince:end_date|default:"0 jour" }})
+            — Comparé à : {{ prev_start|date:"d/m/Y" }} → {{ prev_end|date:"d/m/Y" }}
+        </small>
+    </div>
+    <div class="d-flex gap-2 flex-wrap no-print">
+        <a href="{% url 'sales:sales_report_csv' %}?period={{ period_type }}&start={{ custom_start }}&end={{ custom_end }}"
+           class="btn btn-outline-success btn-sm">
+            <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+        </a>
+        <a href="{% url 'sales:sales_report_pdf' %}?period={{ period_type }}&start={{ custom_start }}&end={{ custom_end }}"
+           class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-file-pdf"></i> PDF
+        </a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-printer"></i> Imprimer
+        </button>
+    </div>
+</div>
+
+<!-- Sélecteur de période -->
+<div class="card mb-4 no-print">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Période</label>
+                <select name="period" class="form-select form-select-sm" id="period-select">
+                    <option value="day"   {% if period_type == 'day' %}selected{% endif %}>Aujourd'hui</option>
+                    <option value="week"  {% if period_type == 'week' %}selected{% endif %}>Cette semaine</option>
+                    <option value="month" {% if period_type == 'month' %}selected{% endif %}>Ce mois</option>
+                    <option value="custom" {% if period_type == 'custom' %}selected{% endif %}>Personnalisée</option>
+                </select>
+            </div>
+            <div class="col-md-3 custom-dates" style="{% if period_type != 'custom' %}display:none{% endif %}">
+                <label class="form-label small mb-1">Du</label>
+                <input type="date" name="start" class="form-control form-control-sm"
+                       value="{{ custom_start }}">
+            </div>
+            <div class="col-md-3 custom-dates" style="{% if period_type != 'custom' %}display:none{% endif %}">
+                <label class="form-label small mb-1">Au</label>
+                <input type="date" name="end" class="form-control form-control-sm"
+                       value="{{ custom_end }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-arrow-clockwise"></i> Actualiser
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Cartes de synthèse -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">Chiffre d'affaires</div>
+                <div class="stat-value text-success">{{ current.revenue|floatformat:0 }} FCFA</div>
+                <div class="mt-1">
+                    {% if comparison.revenue_delta is not None %}
+                        {% if comparison.revenue_delta > 0 %}
+                            <span class="delta-up">▲ +{{ comparison.revenue_delta }}%</span>
+                        {% elif comparison.revenue_delta < 0 %}
+                            <span class="delta-down">▼ {{ comparison.revenue_delta }}%</span>
+                        {% else %}
+                            <span class="delta-flat">= stable</span>
+                        {% endif %}
+                        <small class="text-muted">vs période préc.</small>
+                    {% else %}
+                        <small class="text-muted">Pas de données préc.</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">Transactions</div>
+                <div class="stat-value">{{ current.transactions_count }}</div>
+                <div class="mt-1">
+                    {% if comparison.transactions_delta is not None %}
+                        {% if comparison.transactions_delta > 0 %}
+                            <span class="delta-up">▲ +{{ comparison.transactions_delta }}%</span>
+                        {% elif comparison.transactions_delta < 0 %}
+                            <span class="delta-down">▼ {{ comparison.transactions_delta }}%</span>
+                        {% else %}
+                            <span class="delta-flat">= stable</span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">Panier moyen</div>
+                <div class="stat-value">{{ current.avg_basket|floatformat:0 }} FCFA</div>
+                <div class="mt-1">
+                    {% if comparison.avg_basket_delta is not None %}
+                        {% if comparison.avg_basket_delta > 0 %}
+                            <span class="delta-up">▲ +{{ comparison.avg_basket_delta }}%</span>
+                        {% elif comparison.avg_basket_delta < 0 %}
+                            <span class="delta-down">▼ {{ comparison.avg_basket_delta }}%</span>
+                        {% else %}
+                            <span class="delta-flat">= stable</span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">Marge brute estimée</div>
+                <div class="stat-value text-primary">{{ current.margin_total|floatformat:0 }} FCFA</div>
+                <div class="mt-1">
+                    {% if comparison.margin_delta is not None %}
+                        {% if comparison.margin_delta > 0 %}
+                            <span class="delta-up">▲ +{{ comparison.margin_delta }}%</span>
+                        {% elif comparison.margin_delta < 0 %}
+                            <span class="delta-down">▼ {{ comparison.margin_delta }}%</span>
+                        {% else %}
+                            <span class="delta-flat">= stable</span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cartes secondaires -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body py-2">
+                <small class="text-muted">Total facturé (avec assurances)</small>
+                <div class="fw-bold">{{ current.total_invoiced|floatformat:0 }} FCFA</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body py-2">
+                <small class="text-muted">Créances assurances générées</small>
+                <div class="fw-bold text-info">{{ current.insurance_total|floatformat:0 }} FCFA</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body py-2">
+                <small class="text-muted">Articles vendus</small>
+                <div class="fw-bold">{{ current.items_sold }}
+                    {% if comparison.items_delta is not None %}
+                        <small class="
+                            {% if comparison.items_delta > 0 %}delta-up
+                            {% elif comparison.items_delta < 0 %}delta-down
+                            {% else %}delta-flat{% endif %}">
+                            ({{ comparison.items_delta|floatformat:1 }}%)
+                        </small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphique d'évolution -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Évolution du chiffre d'affaires</h5>
+    </div>
+    <div class="card-body">
+        <div class="chart-container">
+            <canvas id="chart-daily"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques côte à côte -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Répartition par mode de paiement</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="chart-payments"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Top 10 produits (CA)</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="chart-top-products"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Détails : modes de paiement -->
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-credit-card"></i> Détail par mode de paiement</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mode</th>
+                            <th class="text-center">Nb</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in current.by_payment %}
+                        <tr>
+                            <td>{{ p.label }}</td>
+                            <td class="text-center">{{ p.count }}</td>
+                            <td class="text-end fw-bold">{{ p.total|floatformat:0 }} FCFA</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-center text-muted py-3">Aucune donnée</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Détail par caissier -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-person-badge"></i> Performance caissiers</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Caissier</th>
+                            <th class="text-center">Nb ventes</th>
+                            <th class="text-end">CA</th>
+                            <th class="text-end">Panier moy.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in current.by_cashier %}
+                        <tr>
+                            <td>{{ c.username }}</td>
+                            <td class="text-center">{{ c.count }}</td>
+                            <td class="text-end fw-bold">{{ c.total|floatformat:0 }} FCFA</td>
+                            <td class="text-end">{{ c.avg|floatformat:0 }} FCFA</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted py-3">Aucune donnée</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top produits + top marges -->
+<div class="row g-3 mt-3">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-trophy"></i> Top 10 produits par CA</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Médicament</th>
+                            <th class="text-center">Qté</th>
+                            <th class="text-end">CA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in current.top_products %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ p.medicine__name }}</td>
+                            <td class="text-center">{{ p.qty }}</td>
+                            <td class="text-end fw-bold">{{ p.revenue|floatformat:0 }} FCFA</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted py-3">Aucune donnée</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-cash-stack"></i> Top 10 marges</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Médicament</th>
+                            <th class="text-center">Qté</th>
+                            <th class="text-end">Marge</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in current.top_margins %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ p.name }}</td>
+                            <td class="text-center">{{ p.qty }}</td>
+                            <td class="text-end fw-bold text-success">{{ p.margin|floatformat:0 }} FCFA</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted py-3">Aucune donnée</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    const data = {{ chart_data_json|safe }};
+
+    // ─── Graphique évolution journalière ─────────────────────────
+    const dailyCtx = document.getElementById('chart-daily');
+    if (dailyCtx && data.daily.length > 0) {
+        new Chart(dailyCtx, {
+            type: 'line',
+            data: {
+                labels: data.daily.map(d => d.label),
+                datasets: [{
+                    label: 'CA (FCFA)',
+                    data: data.daily.map(d => d.total),
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: data.daily.length > 31 ? 0 : 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => new Intl.NumberFormat('fr-FR').format(ctx.parsed.y) + ' FCFA'
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (v) => new Intl.NumberFormat('fr-FR', {notation: 'compact'}).format(v)
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // ─── Camembert modes de paiement ─────────────────────────────
+    const paymentsCtx = document.getElementById('chart-payments');
+    if (paymentsCtx && data.payments.length > 0) {
+        new Chart(paymentsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: data.payments.map(p => p.label),
+                datasets: [{
+                    data: data.payments.map(p => p.value),
+                    backgroundColor: [
+                        '#0d6efd', '#198754', '#ffc107', '#dc3545',
+                        '#6f42c1', '#20c997', '#fd7e14', '#6c757d'
+                    ],
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                                return `${ctx.label}: ${new Intl.NumberFormat('fr-FR').format(ctx.parsed)} FCFA (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // ─── Barres top produits ─────────────────────────────────────
+    const topCtx = document.getElementById('chart-top-products');
+    if (topCtx && data.top_products.length > 0) {
+        new Chart(topCtx, {
+            type: 'bar',
+            data: {
+                labels: data.top_products.map(p => p.label),
+                datasets: [{
+                    label: 'CA (FCFA)',
+                    data: data.top_products.map(p => p.value),
+                    backgroundColor: '#0d6efd',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => new Intl.NumberFormat('fr-FR').format(ctx.parsed.x) + ' FCFA'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (v) => new Intl.NumberFormat('fr-FR', {notation: 'compact'}).format(v)
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // ─── Afficher/masquer les dates custom ───────────────────────
+    const periodSelect = document.getElementById('period-select');
+    const customDates = document.querySelectorAll('.custom-dates');
+    periodSelect.addEventListener('change', () => {
+        const show = periodSelect.value === 'custom';
+        customDates.forEach(el => el.style.display = show ? '' : 'none');
+    });
+})();
+</script>
+{% endblock %}

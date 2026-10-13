@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import report_views
 
 app_name = 'sales'
 
@@ -17,4 +18,9 @@ urlpatterns = [
     path('preorders/', views.preorder_list, name='preorder_list'),
     path('preorders/<int:pk>/', views.preorder_detail, name='preorder_detail'),
     path('preorders/<int:pk>/deliver/', views.preorder_deliver, name='preorder_deliver'),
+
+    # Rapports
+    path('reports/sales/', report_views.sales_report, name='sales_report'),
+    path('reports/sales/export/csv/', report_views.sales_report_export_csv, name='sales_report_csv'),
+    path('reports/sales/export/pdf/', report_views.sales_report_export_pdf, name='sales_report_pdf'),
 ]

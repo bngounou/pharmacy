@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport {{ start_date }} - {{ end_date }}</title>
+    <style>
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #212529; }
+
+        .header { border-bottom: 3px solid #0d6efd; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { color: #0d6efd; margin: 0; font-size: 20pt; }
+        .header p { margin: 3px 0; color: #6c757d; font-size: 9pt; }
+
+        .period-box {
+            background-color: #f8f9fa;
+            padding: 10px 15px;
+            border-left: 4px solid #0d6efd;
+            margin-bottom: 15px;
+        }
+
+        table.kpi {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table.kpi td {
+            width: 25%;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+            vertical-align: top;
+        }
+        .kpi-label { color: #6c757d; font-size: 8pt; text-transform: uppercase; }
+        .kpi-value { font-size: 14pt; font-weight: bold; }
+        .kpi-value.success { color: #198754; }
+        .kpi-value.primary { color: #0d6efd; }
+        .kpi-delta { font-size: 8pt; }
+        .delta-up { color: #198754; }
+        .delta-down { color: #dc3545; }
+
+        table.data {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table.data th {
+            background-color: #495057;
+            color: white;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 9pt;
+        }
+        table.data td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 9pt;
+        }
+        .text-end { text-align: right; }
+        .text-center { text-align: center; }
+
+        h2.section {
+            font-size: 12pt;
+            color: #0d6efd;
+            border-bottom: 2px solid #0d6efd;
+            padding-bottom: 5px;
+            margin-top: 25px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+            font-size: 8pt;
+            color: #6c757d;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>PharmaGest — Rapport de ventes</h1>
+        <p>Généré le {{ today|date:"d/m/Y à H:i" }}</p>
+    </div>
+
+    <div class="period-box">
+        <strong>Période analysée :</strong> {{ start_date|date:"d/m/Y" }} → {{ end_date|date:"d/m/Y" }}<br>
+        <small>Comparé à : {{ prev_start|date:"d/m/Y" }} → {{ prev_end|date:"d/m/Y" }}</small>
+    </div>
+
+    <h2 class="section">Synthèse</h2>
+    <table class="kpi">
+        <tr>
+            <td>
+                <div class="kpi-label">Chiffre d'affaires</div>
+                <div class="kpi-value success">{{ data.revenue|floatformat:0 }}</div>
+                <div class="kpi-delta">
+                    {% if comparison.revenue_delta is not None %}
+                        <span class="{% if comparison.revenue_delta > 0 %}delta-up{% elif comparison.revenue_delta < 0 %}delta-down{% endif %}">
+                            {% if comparison.revenue_delta > 0 %}▲{% elif comparison.revenue_delta < 0 %}▼{% endif %}
+                            {{ comparison.revenue_delta }}%
+                        </span>
+                    {% endif %}
+                </div>
+            </td>
+            <td>
+                <div class="kpi-label">Transactions</div>
+                <div class="kpi-value">{{ data.transactions_count }}</div>
+                <div class="kpi-delta">
+                    {% if comparison.transactions_delta is not None %}
+                        <span class="{% if comparison.transactions_delta > 0 %}delta-up{% elif comparison.transactions_delta < 0 %}delta-down{% endif %}">
+                            {% if comparison.transactions_delta > 0 %}▲{% elif comparison.transactions_delta < 0 %}▼{% endif %}
+                            {{ comparison.transactions_delta }}%
+                        </span>
+                    {% endif %}
+                </div>
+            </td>
+            <td>
+                <div class="kpi-label">Panier moyen</div>
+                <div class="kpi-value">{{ data.avg_basket|floatformat:0 }}</div>
+                <div class="kpi-delta">
+                    {% if comparison.avg_basket_delta is not None %}
+                        <span class="{% if comparison.avg_basket_delta > 0 %}delta-up{% elif comparison.avg_basket_delta < 0 %}delta-down{% endif %}">
+                            {% if comparison.avg_basket_delta > 0 %}▲{% elif comparison.avg_basket_delta < 0 %}▼{% endif %}
+                            {{ comparison.avg_basket_delta }}%
+                        </span>
+                    {% endif %}
+                </div>
+            </td>
+            <td>
+                <div class="kpi-label">Marge brute</div>
+                <div class="kpi-value primary">{{ data.margin_total|floatformat:0 }}</div>
+                <div class="kpi-delta">
+                    {% if comparison.margin_delta is not None %}
+                        <span class="{% if comparison.margin_delta > 0 %}delta-up{% elif comparison.margin_delta < 0 %}delta-down{% endif %}">
+                            {% if comparison.margin_delta > 0 %}▲{% elif comparison.margin_delta < 0 %}▼{% endif %}
+                            {{ comparison.margin_delta }}%
+                        </span>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <p style="font-size: 9pt; color: #6c757d;">
+        Total facturé (avec assurance) : <strong>{{ data.total_invoiced|floatformat:0 }} FCFA</strong> —
+        Créances assurances générées : <strong>{{ data.insurance_total|floatformat:0 }} FCFA</strong> —
+        Articles vendus : <strong>{{ data.items_sold }}</strong>
+    </p>
+
+    <h2 class="section">Répartition par mode de paiement</h2>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Mode de paiement</th>
+                <th class="text-center">Transactions</th>
+                <th class="text-end">Montant (FCFA)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in data.by_payment %}
+            <tr>
+                <td>{{ p.label }}</td>
+                <td class="text-center">{{ p.count }}</td>
+                <td class="text-end">{{ p.total|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center">Aucune donnée</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 class="section">Performance par caissier</h2>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Caissier</th>
+                <th class="text-center">Nb ventes</th>
+                <th class="text-end">CA (FCFA)</th>
+                <th class="text-end">Panier moyen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in data.by_cashier %}
+            <tr>
+                <td>{{ c.username }}</td>
+                <td class="text-center">{{ c.count }}</td>
+                <td class="text-end">{{ c.total|floatformat:0 }}</td>
+                <td class="text-end">{{ c.avg|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center">Aucune donnée</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 class="section">Top 10 produits par chiffre d'affaires</h2>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Médicament</th>
+                <th class="text-center">Quantité</th>
+                <th class="text-end">CA (FCFA)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in data.top_products %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ p.medicine__name }}</td>
+                <td class="text-center">{{ p.qty }}</td>
+                <td class="text-end">{{ p.revenue|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center">Aucune donnée</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 class="section">Top 10 marges</h2>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Médicament</th>
+                <th class="text-center">Quantité</th>
+                <th class="text-end">Marge (FCFA)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in data.top_margins %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ p.name }}</td>
+                <td class="text-center">{{ p.qty }}</td>
+                <td class="text-end">{{ p.margin|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center">Aucune donnée</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Rapport PharmaGest — {{ start_date|date:"d/m/Y" }} au {{ end_date|date:"d/m/Y" }}
+    </div>
+
+</body>
+</html>
