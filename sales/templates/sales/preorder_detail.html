@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Précommande #{{ sale.pk }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Précommande #{{ sale.pk }}</h2>
+        <small class="text-muted">
+            {{ sale.customer_name|default:"Client non renseigné" }}
+            {% if sale.customer_phone %} · {{ sale.customer_phone }}{% endif %}
+        </small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'sales:preorder_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Liste
+        </a>
+        <a href="{% url 'sales:detail' sale.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-receipt"></i> Reçu
+        </a>
+    </div>
+</div>
+
+<!-- Infos vente -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <small class="text-muted">Date de vente</small><br>
+                <strong>{{ sale.created_at|date:"d/m/Y H:i" }}</strong>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Livraison prévue</small><br>
+                <strong>{{ sale.expected_delivery_date|date:"d/m/Y"|default:"—" }}</strong>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Montant total</small><br>
+                <strong>{{ sale.total_amount|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Statut</small><br>
+                <span class="badge bg-{% if sale.status == 'completed' %}success{% elif sale.status == 'partial' %}warning{% else %}secondary{% endif %} fs-6">
+                    {{ sale.get_status_display }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Articles à livrer -->
+{% if pending_items %}
+<form method="post" action="{% url 'sales:preorder_deliver' sale.pk %}">
+    {% csrf_token %}
+
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        Saisissez les quantités à livrer maintenant. Laissez à 0 les articles non disponibles.
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-hourglass-split"></i>
+                À livrer ({{ pending_items|length }} article{{ pending_items|length|pluralize }})
+            </h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Médicament</th>
+                        <th class="text-center">Commandé</th>
+                        <th class="text-center">Déjà livré</th>
+                        <th class="text-center">Reste à livrer</th>
+                        <th class="text-center">Stock dispo</th>
+                        <th class="text-center" style="width: 140px;">À livrer maintenant</th>
+                        <th class="text-center">État stock</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in pending_items %}
+                    <tr>
+                        <td><strong>{{ item.medicine.name }}</strong></td>
+                        <td class="text-center">{{ item.quantity }}</td>
+                        <td class="text-center">{{ item.quantity_in_stock }}</td>
+                        <td class="text-center fw-bold text-warning">{{ item.quantity_backorder }}</td>
+                        <td class="text-center">{{ item.available_stock }}</td>
+                        <td>
+                            {% if item.can_deliver %}
+                                <input type="number"
+                                       name="qty_{{ item.id }}"
+                                       class="form-control form-control-sm"
+                                       min="0"
+                                       max="{{ item.max_deliverable }}"
+                                       value="{% if item.available_stock >= item.quantity_backorder %}{{ item.quantity_backorder }}{% else %}{{ item.max_deliverable }}{% endif %}"
+                                       style="text-align: center;">
+                            {% else %}
+                                <input type="number" class="form-control form-control-sm" value="0" disabled>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.available_stock == 0 %}
+                                <span class="badge bg-danger">Rupture</span>
+                            {% elif item.available_stock < item.quantity_backorder %}
+                                <span class="badge bg-warning text-dark">Insuffisant</span>
+                            {% else %}
+                                <span class="badge bg-success">OK</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i>
+                    La livraison déduit le stock des lots disponibles (FEFO).
+                </small>
+                <button type="submit" class="btn btn-success btn-lg"
+                        onclick="return confirm('Confirmer la livraison des articles saisis ?');">
+                    <i class="bi bi-check-circle"></i> Valider la livraison
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% else %}
+<div class="alert alert-success">
+    <i class="bi bi-check-circle"></i>
+    <strong>Tous les articles ont été livrés.</strong>
+    Cette précommande est terminée.
+</div>
+{% endif %}
+
+<!-- Historique des livraisons -->
+{% if delivered_items %}
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-check2-circle"></i> Articles déjà livrés ({{ delivered_items|length }})</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Médicament</th>
+                    <th class="text-center">Commandé</th>
+                    <th class="text-center">Livré</th>
+                    <th class="text-end">Prix unitaire</th>
+                    <th class="text-end">Sous-total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in delivered_items %}
+                <tr class="table-light">
+                    <td>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        {{ item.medicine.name }}
+                    </td>
+                    <td class="text-center">{{ item.quantity }}</td>
+                    <td class="text-center">{{ item.quantity_in_stock }}</td>
+                    <td class="text-end">{{ item.unit_price|floatformat:0 }} FCFA</td>
+                    <td class="text-end">{{ item.subtotal|floatformat:0 }} FCFA</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

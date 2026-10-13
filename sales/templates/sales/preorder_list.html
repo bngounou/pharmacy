@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Précommandes à livrer{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-hourglass-split"></i> Précommandes à livrer</h2>
+        <small class="text-muted">
+            {{ total_pending }} vente{{ total_pending|pluralize }} avec article(s) en attente
+        </small>
+    </div>
+    <a href="{% url 'sales:pos' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-cart-check"></i> Point de vente
+    </a>
+</div>
+
+<!-- Filtres -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Recherche</label>
+                <input type="text" name="q" value="{{ search }}"
+                       class="form-control form-control-sm"
+                       placeholder="Nom du client, téléphone, n° vente...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Statut</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">— Tous —</option>
+                    {% for value, label in status_choices %}
+                        {% if value in 'pending,partial,completed' %}
+                            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-funnel"></i> Filtrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Vente</th>
+                    <th>Client</th>
+                    <th>Téléphone</th>
+                    <th>Date vente</th>
+                    <th>Livraison prévue</th>
+                    <th class="text-center">Articles en attente</th>
+                    <th class="text-end">Total</th>
+                    <th>Statut</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in page_obj %}
+                <tr class="{% if sale.expected_delivery_date and sale.expected_delivery_date < today %}table-warning{% endif %}">
+                    <td>
+                        <a href="{% url 'sales:preorder_detail' sale.pk %}">
+                            <strong>#{{ sale.pk }}</strong>
+                        </a>
+                    </td>
+                    <td>{{ sale.customer_name|default:"—" }}</td>
+                    <td>{{ sale.customer_phone|default:"—" }}</td>
+                    <td>{{ sale.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        {% if sale.expected_delivery_date %}
+                            {{ sale.expected_delivery_date|date:"d/m/Y" }}
+                            {% if sale.expected_delivery_date < today %}
+                                <span class="badge bg-danger">En retard</span>
+                            {% elif sale.expected_delivery_date == today %}
+                                <span class="badge bg-warning text-dark">Aujourd'hui</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-warning text-dark">{{ sale.pending_items }}</span>
+                    </td>
+                    <td class="text-end fw-bold">{{ sale.total_amount|floatformat:0 }} FCFA</td>
+                    <td>
+                        {% if sale.status == 'pending' %}
+                            <span class="badge bg-secondary">En attente</span>
+                        {% elif sale.status == 'partial' %}
+                            <span class="badge bg-warning text-dark">Partielle</span>
+                        {% else %}
+                            <span class="badge bg-info">{{ sale.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'sales:preorder_detail' sale.pk %}"
+                           class="btn btn-sm btn-primary">
+                            <i class="bi bi-box-arrow-in-down"></i> Livrer
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        <i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>
+                        Aucune précommande en attente 🎉
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

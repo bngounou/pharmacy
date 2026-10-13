@@ -611,3 +611,166 @@ def cash_closure_validate(request, pk):
         closure.save(update_fields=['is_validated', 'validated_by', 'validated_at'])
         messages.success(request, "Clôture validée.")
     return redirect('sales:cash_closure_detail', pk=closure.pk)
+
+from django.core.paginator import Paginator
+from django.db.models import Count, Q
+
+
+@login_required
+def preorder_list(request):
+    """
+    Liste des précommandes en attente de livraison.
+    Regroupe par vente (client).
+    """
+    qs = Sale.objects.filter(
+        items__is_backorder=True,
+        items__delivered=False,
+    ).distinct().select_related('cashier', 'insurance')
+
+    status_filter = request.GET.get('status', '')
+    search = request.GET.get('q', '').strip()
+
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if search:
+        qs = qs.filter(
+            Q(customer_name__icontains=search) |
+            Q(customer_phone__icontains=search) |
+            Q(id__icontains=search)
+        )
+
+    qs = qs.annotate(
+        pending_items=Count(
+            'items',
+            filter=Q(items__is_backorder=True, items__delivered=False)
+        )
+    ).order_by('expected_delivery_date', '-created_at')
+
+    paginator = Paginator(qs, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    # Compteurs
+    total_pending = Sale.objects.filter(
+        items__is_backorder=True, items__delivered=False
+    ).distinct().count()
+
+    context = {
+        'page_obj': page_obj,
+        'total_pending': total_pending,
+        'status_filter': status_filter,
+        'search': search,
+        'today': timezone.now().date(),
+        'status_choices': Sale.STATUS_CHOICES,
+    }
+    return render(request, 'sales/preorder_list.html', context)
+
+
+@login_required
+def preorder_detail(request, pk):
+    """Détail d'une précommande avec formulaire de livraison."""
+    sale = get_object_or_404(
+        Sale.objects.select_related('cashier', 'insurance'),
+        pk=pk
+    )
+    items = sale.items.filter(
+        is_backorder=True
+    ).select_related('medicine').order_by('medicine__name')
+
+    pending_items = [i for i in items if not i.delivered]
+    delivered_items = [i for i in items if i.delivered]
+
+    # Pour chaque ligne en attente, vérifier la dispo de stock actuelle
+    for item in pending_items:
+        item.available_stock = item.medicine.total_stock
+        item.max_deliverable = min(item.available_stock, item.quantity_backorder)
+        item.can_deliver = item.available_stock > 0
+
+    context = {
+        'sale': sale,
+        'pending_items': pending_items,
+        'delivered_items': delivered_items,
+        'today': timezone.now().date(),
+    }
+    return render(request, 'sales/preorder_detail.html', context)
+
+
+@login_required
+@require_POST
+def preorder_deliver(request, pk):
+    """Livre tout ou partie des articles en précommande."""
+    sale = get_object_or_404(Sale, pk=pk)
+    pending = sale.items.filter(is_backorder=True, delivered=False)
+
+    if not pending.exists():
+        messages.info(request, "Aucun article à livrer sur cette vente.")
+        return redirect('sales:preorder_detail', pk=pk)
+
+    errors = []
+    delivered_any = False
+
+    with transaction.atomic():
+        for item in pending:
+            try:
+                qty = int(request.POST.get(f'qty_{item.id}', 0))
+            except (ValueError, TypeError):
+                qty = 0
+
+            if qty <= 0:
+                continue
+
+            if qty > item.quantity_backorder:
+                errors.append(
+                    f"{item.medicine.name} : quantité demandée ({qty}) "
+                    f"supérieure au reste à livrer ({item.quantity_backorder})."
+                )
+                continue
+
+            medicine = Medicine.objects.select_for_update().get(pk=item.medicine_id)
+            available = medicine.total_stock
+
+            if available < qty:
+                errors.append(
+                    f"{item.medicine.name} : stock insuffisant "
+                    f"(disponible : {available}, demandé : {qty})."
+                )
+                continue
+
+            # Déduction FEFO
+            _deduct_stock_fefo(medicine, qty)
+
+            # Mise à jour de la ligne
+            item.quantity_in_stock += qty
+            item.quantity_backorder -= qty
+            if item.quantity_backorder == 0:
+                item.delivered = True
+            item.save(update_fields=[
+                'quantity_in_stock', 'quantity_backorder', 'delivered'
+            ])
+            delivered_any = True
+
+    if errors:
+        for err in errors:
+            messages.error(request, err)
+
+    if delivered_any:
+        remaining = sale.items.filter(is_backorder=True, delivered=False).count()
+        if remaining == 0:
+            sale.status = 'completed'
+            sale.delivered_at = timezone.now()
+            sale.save(update_fields=['status', 'delivered_at'])
+            messages.success(
+                request,
+                f"✅ Vente #{sale.pk} entièrement livrée — statut : Terminée."
+            )
+        else:
+            sale.status = 'partial'
+            sale.save(update_fields=['status'])
+            messages.success(
+                request,
+                f"Livraison partielle enregistrée. {remaining} ligne(s) restante(s)."
+            )
+    elif not errors:
+        messages.warning(request, "Aucune quantité saisie.")
+
+    return redirect('sales:preorder_detail', pk=pk)
+

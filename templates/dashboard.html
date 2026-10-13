@@ -34,6 +34,7 @@
         </div>
     </div>
     <div class="col-md-3">
+    <a href="{% url 'inventory:reorder_dashboard' %}" class="text-decoration-none">
         <div class="card stat-card warning h-100">
             <div class="card-body">
                 <div class="stat-label">Stock faible</div>
@@ -41,16 +42,9 @@
                 <small class="text-muted">à réapprovisionner</small>
             </div>
         </div>
+    </a>
     </div>
-    <div class="col-md-3">
-        <div class="card stat-card danger h-100">
-            <div class="card-body">
-                <div class="stat-label">Alertes péremption</div>
-                <div class="stat-value text-danger">{{ expired_batches }}</div>
-                <small class="text-muted">{{ expiring_soon }} expirent dans 30j</small>
-            </div>
-        </div>
-    </div>
+
     <div class="col-md-3">
     <a href="{% url 'inventory:expiring_dashboard' %}" class="text-decoration-none">
         <div class="card stat-card danger h-100">
@@ -67,7 +61,18 @@
             </div>
         </div>
     </a>
-</div>
+    </div>
+    <div class="col-md-3">
+    <a href="{% url 'sales:preorder_list' %}" class="text-decoration-none">
+        <div class="card stat-card warning h-100">
+            <div class="card-body">
+                <div class="stat-label">Précommandes à livrer</div>
+                <div class="stat-value text-warning">{{ pending_preorders_count }}</div>
+                <small class="text-muted">clients en attente</small>
+            </div>
+        </div>
+    </a>
+    </div>
 </div>
 
 <div class="row g-3">

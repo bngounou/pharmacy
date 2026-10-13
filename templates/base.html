@@ -41,6 +41,11 @@
                         <i class="bi bi-cart-check"></i> Point de vente
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'sales:preorder_list' %}">
+                        <i class="bi bi-hourglass-split"></i> Précommandes
+                    </a>
+                </li>
 
                 {% if user.can_manage_insurance or user.is_superuser %}
                 <li class="nav-item">

@@ -41,6 +41,10 @@ def dashboard(request):
         expiry_date__lt=today,
     ).count()
 
+    pending_preorders_count = Sale.objects.filter(
+        items__is_backorder=True, items__delivered=False
+    ).distinct().count()
+
     # ─── CONTEXTE (tout en dernier) ──────────────────────────────
     context = {
         'total_medicines': total_medicines,
@@ -56,6 +60,7 @@ def dashboard(request):
         # Nouveaux champs
         'expiring_30_count': expiring_30,
         'expired_count': expired_count,
+        'pending_preorders_count': pending_preorders_count,
 
     }
     return render(request, 'dashboard.html', context)

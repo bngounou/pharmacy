@@ -14,4 +14,7 @@ urlpatterns = [
     path('closures/new/', views.cash_closure_new, name='cash_closure_new'),
     path('closures/<int:pk>/', views.cash_closure_detail, name='cash_closure_detail'),
     path('closures/<int:pk>/validate/', views.cash_closure_validate, name='cash_closure_validate'),
+    path('preorders/', views.preorder_list, name='preorder_list'),
+    path('preorders/<int:pk>/', views.preorder_detail, name='preorder_detail'),
+    path('preorders/<int:pk>/deliver/', views.preorder_deliver, name='preorder_deliver'),
 ]
